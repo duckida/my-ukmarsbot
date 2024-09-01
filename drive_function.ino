@@ -135,6 +135,8 @@ void drive(float lSpeed, float rSpeed) {
     Serial.print(encoderLeftCount);
     Serial.print(' ');
     Serial.print(encoderRightCount);
+    Serial.print(' ');
+    Serial.print(finalComp);
     Serial.println(); 
     if (encoderRightCount > 0 && encoderLeftCount > 0) {
       compensation = encoderRightCount / encoderLeftCount;
@@ -143,6 +145,7 @@ void drive(float lSpeed, float rSpeed) {
       setMotorVolts(lSpeed, rSpeed * finalComp);
     }
     setMotorVolts(lSpeed, rSpeed);
+    delay(100);
   }
 }
 
