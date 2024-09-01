@@ -15,12 +15,12 @@ const int MOTOR_RIGHT_PWM = 10;
 const int LED_RIGHT = 6;
 const int LED_LEFT = 11;
 const int EMITTER = 12;
-const int SENSOR_0 = A0;
+const int SENSOR_RIGHT_MARK = A0;
 const int SENSOR_1 = A1;
 const int SENSOR_2 = A2;
 const int SENSOR_3 = A3;
 const int SENSOR_4 = A4;
-const int SENSOR_5 = A5;
+const int SENSOR_LEFT_MARK = A5;
 const int FUNCTION_PIN = A6;
 const int BATTERY_VOLTS = A7;
 /****/
@@ -29,10 +29,15 @@ const int BATTERY_VOLTS = A7;
  * Global variables
  */
 
+volatile int32_t encoderLeftCount;
+volatile int32_t encoderRightCount;
 uint32_t updateTime;
-uint32_t updateInterval = 40;  // (ms) do not make this smaller than 25ms for performance reasons
+uint32_t updateInterval = 100;  // in milliseconds
+const float MAX_MOTOR_VOLTS = 6.0f;
+const float batteryDividerRatio = 2.0f;
 
-// the default values for the front sensor when the robot is backed up to a wall
+// Wall Sensor data setup
+
 const int FRONT_REFERENCE = 44;
 // the default values for the side sensors when the robot is centred in a cell
 const int LEFT_REFERENCE = 38;
@@ -48,9 +53,6 @@ int gFrontReference = FRONT_REFERENCE;
 int gLeftReference = LEFT_REFERENCE;
 int gRightReference = RIGHT_REFERENCE;
 // the current value of the sensors
-volatile int32_t encoderLeftCount;
-volatile int32_t encoderRightCount;
-
 volatile int gSensorFront;
 volatile int gSensorLeft;
 volatile int gSensorRight;
@@ -62,8 +64,6 @@ volatile bool gRightWall;
 volatile int gSensorFrontError;   // zero when robot in cell centre
 volatile float gSensorCTE;  // zero when robot in cell centre
 
-const float MAX_MOTOR_VOLTS = 6.0f;
-const float batteryDividerRatio = 2.0f;
 
 float gBatteryVolts;
 float getBatteryVolts() {
@@ -161,7 +161,19 @@ void drive(float lSpeed, float rSpeed) {
   float compensation = 0;
   float finalComp = 0;
   while (endTime > millis()) {
-    printSensors();
+    /* Serial.print(encoderLeftCount);
+    Serial.print(' ');
+    Serial.print(encoderRightCount);
+    Serial.println(); */
+    Serial.print(F("  Right: "));
+    Serial.print(gSensorRight);
+    Serial.print(F("  Front: "));
+    Serial.print(gSensorFront);
+    Serial.print(F("  Left: "));
+    Serial.print(gSensorLeft);
+    Serial.print(F("  Error: "));
+    Serial.print(gSensorCTE);
+    Serial.println(); // sends "\r\n"
     if (encoderRightCount > 0 && encoderLeftCount > 0) {
       compensation = encoderRightCount / encoderLeftCount;
       //Serial.println(compensation);
@@ -172,6 +184,28 @@ void drive(float lSpeed, float rSpeed) {
   }
 }
 
+void analogueSetup() {
+  // increase speed of ADC conversions to 28us each
+  // by changing the clock prescaler from 128 to 16
+  bitClear(ADCSRA, ADPS0);
+  bitClear(ADCSRA, ADPS1);
+  bitSet(ADCSRA, ADPS2);
+}
+
+void setupSystick() {
+  // set the mode for timer 2
+  bitClear(TCCR2A, WGM20);
+  bitSet(TCCR2A, WGM21);
+  bitClear(TCCR2B, WGM22);
+  // set divisor to 128 => timer clock = 125kHz
+  bitSet(TCCR2B, CS22);
+  bitClear(TCCR2B, CS21);
+  bitSet(TCCR2B, CS20);
+  // set the timer frequency
+  OCR2A = 249;  // (16000000/128/500)-1 = 249
+  // enable the timer interrupt
+  bitSet(TIMSK2, OCIE2A);
+}
 
 void setupEncoder() {
     // left
@@ -192,59 +226,6 @@ void setupEncoder() {
   // enable the interrupt
   bitSet(EIMSK, INT1);
   encoderRightCount = 0;
-}
-
-ISR(INT0_vect) {
-  static bool oldB = 0;
-  bool newB = bool(digitalReadFast(ENCODER_LEFT_B));
-  bool newA = bool(digitalReadFast(ENCODER_LEFT_CLK)) ^ newB;
-  if (newA == oldB) {
-    encoderLeftCount--;
-  } else {
-    encoderLeftCount++;
-  }
-  oldB = newB;
-}
-
-ISR(INT1_vect) {
-  static bool oldB = 0;
-  bool newB = bool(digitalReadFast(ENCODER_RIGHT_B));
-  bool newA = bool(digitalReadFast(ENCODER_RIGHT_CLK)) ^ newB;
-  if (newA == oldB) {
-    encoderRightCount--;
-  } else {
-    encoderRightCount++;
-  }
-  oldB = newB;
-}
-
-
-void analogueSetup() {
-  // increase speed of ADC conversions to 28us each
-  // by changing the clock prescaler from 128 to 16
-  bitClear(ADCSRA, ADPS0);
-  bitClear(ADCSRA, ADPS1);
-  bitSet(ADCSRA, ADPS2);
-}
-
-/***
- * If you are interested in what all this does, the ATMega328P datasheet
- * has all the answers but it is not easy to follow until you have some
- * experience. For now just use the code as it is.
- */
-void setupSystick() {
-  // set the mode for timer 2
-  bitClear(TCCR2A, WGM20);
-  bitSet(TCCR2A, WGM21);
-  bitClear(TCCR2B, WGM22);
-  // set divisor to 128 => timer clock = 125kHz
-  bitSet(TCCR2B, CS22);
-  bitClear(TCCR2B, CS21);
-  bitSet(TCCR2B, CS20);
-  // set the timer frequency
-  OCR2A = 249;  // (16000000/128/500)-1 = 249
-  // enable the timer interrupt
-  bitSet(TIMSK2, OCIE2A);
 }
 
 void updateWallSensor() {
@@ -287,22 +268,45 @@ void updateWallSensor() {
   gSensorFront = front;
 }
 
-
-// the systick event is an ISR attached to Timer 2
 ISR(TIMER2_COMPA_vect) {
   updateWallSensor();
 }
 
+ISR(INT0_vect) {
+  static bool oldB = 0;
+  bool newB = bool(digitalReadFast(ENCODER_LEFT_B));
+  bool newA = bool(digitalReadFast(ENCODER_LEFT_CLK)) ^ newB;
+  if (newA == oldB) {
+    encoderLeftCount--;
+  } else {
+    encoderLeftCount++;
+  }
+  oldB = newB;
+}
+
+ISR(INT1_vect) {
+  static bool oldB = 0;
+  bool newB = bool(digitalReadFast(ENCODER_RIGHT_B));
+  bool newA = bool(digitalReadFast(ENCODER_RIGHT_CLK)) ^ newB;
+  if (newA == oldB) {
+    encoderRightCount--;
+  } else {
+    encoderRightCount++;
+  }
+  oldB = newB;
+}
+
 void setup() {
   Serial.begin(9600);
+  Serial.println(F("Hello\n"));
   pinMode(EMITTER, OUTPUT);
   pinMode(LED_RIGHT, OUTPUT);
   pinMode(LED_LEFT, OUTPUT);
   digitalWrite(EMITTER, 0);  // be sure the emitter is off
-  analogueSetup();           // increase the ADC conversion speed
-  setupSystick();
   motorSetup();
   setupEncoder();
+  // analogueSetup();           // increase the ADC conversion speed
+  setupSystick();
   updateTime = millis() + updateInterval;
 }
 
@@ -396,20 +400,8 @@ void runRobot() {
   delay(500);
 }
 
-void printSensors() {
-    Serial.print(F("  Left: "));
-    Serial.print(gSensorLeft);
-    Serial.print(F("  Front: "));
-    Serial.print(gSensorFront);
-    Serial.print(F("  Right: "));
-    Serial.print(gSensorRight);
-    Serial.print(F("  Error: "));
-    Serial.print(gSensorCTE);
-    Serial.println(); // sends "\r\n"
-}
 
 
-uint32_t i;
 void loop() {
   if (getFunctionSwitch() == 16) {
     // button is pressed so wait until it is released
@@ -422,17 +414,5 @@ void loop() {
     encoderRightCount = 0;
     delay(500);
     runRobot();
-  }
-  if (millis() > updateTime) {
-    updateTime += updateInterval;
-    Serial.print(F("  Left: "));
-    Serial.print(gSensorLeft);
-    Serial.print(F("  Front: "));
-    Serial.print(gSensorFront);
-    Serial.print(F("  Right: "));
-    Serial.print(gSensorRight);
-    Serial.print(F("  Error: "));
-    Serial.print(gSensorCTE);
-    Serial.println(); // sends "\r\n"
   }
 }
