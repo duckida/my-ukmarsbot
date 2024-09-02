@@ -201,7 +201,7 @@ void driveAngle(float lSpeed, float rSpeed, float deg) {
   float compensation; // The compensation value
   float finalComp; // 1 / compensation value
 
-  float difference = deg * 3.1166666667; // The number of encoder difference to travel
+  float difference = deg * 3.1166666667; // The encoder difference to travel
   int encoderDifference = 0; // Difference of 2 encoders
 
   Serial.print("Difference: ");
@@ -411,7 +411,7 @@ void loop() {
     encoderRightCount = 0;
     delay(500);
     //runRobot();
-    runMaze();
+    runAngle();
   }
 
 }
