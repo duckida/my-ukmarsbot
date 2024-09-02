@@ -136,6 +136,8 @@ void setMotorVolts(float left, float right) {
 }
 
 void drive(float lSpeed, float rSpeed) {
+  encoderLeftCount = 0;
+  encoderRightCount = 0;
   Serial.println("Drive Function");
   uint32_t endTime = millis() + 2000;
   float compensation = 0;
@@ -148,12 +150,13 @@ void drive(float lSpeed, float rSpeed) {
     Serial.print(finalComp);
     Serial.println(); 
     if (encoderRightCount > 0 && encoderLeftCount > 0) {
-      compensation = encoderRightCount / encoderLeftCount;
+      compensation = (float)encoderRightCount / (float)encoderLeftCount;
       //Serial.println(compensation);
       finalComp = 1 / compensation;
       setMotorVolts(lSpeed, rSpeed * finalComp);
+    } else {
+      setMotorVolts(lSpeed, rSpeed);
     }
-    setMotorVolts(lSpeed, rSpeed);
     delay(100);
   }
 }
@@ -183,9 +186,10 @@ void driveDistance(float lSpeed, float rSpeed, float mm) {
       compensation = (float)encoderRightCount / (float)encoderLeftCount;
       //Serial.println(compensation);
       finalComp = 1 / compensation;
-      setMotorVolts(lSpeed, rSpeed * finalComp * 0.8);
+      setMotorVolts(lSpeed, rSpeed * finalComp);
+    } else {
+      setMotorVolts(lSpeed, rSpeed);
     }
-    setMotorVolts(lSpeed, rSpeed);
     firstStep = encoderRightCount + encoderLeftCount;
     encoderAvg = firstStep / 2;
   }
