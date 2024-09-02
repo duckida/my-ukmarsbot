@@ -159,6 +159,8 @@ void drive(float lSpeed, float rSpeed) {
 }
 
 void driveDistance(float lSpeed, float rSpeed, float mm) {
+  encoderLeftCount = 0;
+  encoderRightCount = 0;
   Serial.println("Drive Distance Function");
   float compensation; // The compensation value
   float finalComp; // 1 / compensation value
@@ -168,7 +170,7 @@ void driveDistance(float lSpeed, float rSpeed, float mm) {
   int encoderAvg = 0; // Average of 2 encoders
 
   //234 c = 113 mm
-  circumferences = mm / 113;
+  circumferences = mm / 105;
   counts = circumferences * 234;
   while (encoderAvg < counts) {
     Serial.print(encoderLeftCount);
@@ -181,7 +183,7 @@ void driveDistance(float lSpeed, float rSpeed, float mm) {
       compensation = (float)encoderRightCount / (float)encoderLeftCount;
       //Serial.println(compensation);
       finalComp = 1 / compensation;
-      setMotorVolts(lSpeed, rSpeed * finalComp * 0.93);
+      setMotorVolts(lSpeed, rSpeed * finalComp * 0.8);
     }
     setMotorVolts(lSpeed, rSpeed);
     firstStep = encoderRightCount + encoderLeftCount;
@@ -334,7 +336,7 @@ void runRobot() {
 
 void runDistance() {
   getBatteryVolts();
-  driveDistance(1.5,  1.5, 100); // Speed 1.5, 100 mm
+  driveDistance(1.5,  1.5, 180); // Speed 1.5, 180 mm
 }
 
 
@@ -351,5 +353,8 @@ void loop() {
     delay(500);
     //runRobot();
     runDistance();
+    delay(1000);
+    runDistance();
   }
+
 }
