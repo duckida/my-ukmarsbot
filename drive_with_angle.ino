@@ -382,7 +382,20 @@ void runDistance() {
 
 void runAngle() {
   getBatteryVolts();
-  driveAngle(1.5,  1.5, 180); // Speed 1.5, 180 degrees
+  driveAngle(1.5,  1.5, -90); // Speed 1.5, 180 degrees
+}
+
+void runMaze() {
+  getBatteryVolts();
+  driveDistance(1.5,  1.5, 180);
+  delay(100);
+  driveDistance(1.5,  1.5, 180);
+  delay(100);
+  driveDistance(1.5,  1.5, 180);
+  delay(100);
+  driveDistance(1.5,  1.5, 180);
+  delay(100);
+  driveAngle(1.5,  1.5, -90);
 }
 
 
@@ -398,7 +411,7 @@ void loop() {
     encoderRightCount = 0;
     delay(500);
     //runRobot();
-    runAngle();
+    runMaze();
   }
 
 }
