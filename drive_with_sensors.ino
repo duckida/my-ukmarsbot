@@ -1,5 +1,7 @@
+//BLE Serial is for bluetooth module only
 #include <Arduino.h>
 #include "digitalWriteFast.h"
+#include <SoftwareSerial.h> 
 /**
  * Hardware pin defines
  */
@@ -23,11 +25,14 @@ const int SENSOR_4 = A4;
 const int SENSOR_LEFT_MARK = A5;
 const int FUNCTION_PIN = A6;
 const int BATTERY_VOLTS = A7;
+
 /****/
 
 /***
  * Global variables
  */
+
+SoftwareSerial bleSerial(0, 1); 
 
 volatile int32_t encoderLeftCount;
 volatile int32_t encoderRightCount;
@@ -161,11 +166,8 @@ void drive(float lSpeed, float rSpeed) {
   float compensation = 0;
   float finalComp = 0;
   while (endTime > millis()) {
-    /* Serial.print(encoderLeftCount);
-    Serial.print(' ');
-    Serial.print(encoderRightCount);
-    Serial.println(); */
-    Serial.print(F("  Right: "));
+    
+    /* Serial.print(F("  Right: "));
     Serial.print(gSensorRight);
     Serial.print(F("  Front: "));
     Serial.print(gSensorFront);
@@ -173,14 +175,32 @@ void drive(float lSpeed, float rSpeed) {
     Serial.print(gSensorLeft);
     Serial.print(F("  Error: "));
     Serial.print(gSensorCTE);
-    Serial.println(); // sends "\r\n"
+    Serial.println(); // sends "\r\n"*/
+    
     if (encoderRightCount > 0 && encoderLeftCount > 0) {
-      compensation = encoderRightCount / encoderLeftCount;
-      //Serial.println(compensation);
+      compensation = (float)encoderRightCount / (float)encoderLeftCount;
       finalComp = 1 / compensation;
       setMotorVolts(lSpeed, rSpeed * finalComp);
+      bleSerial.print(encoderLeftCount);
+      bleSerial.print(' ');
+      bleSerial.print(encoderRightCount);
+      bleSerial.print(' ');
+      bleSerial.print(lSpeed);
+      bleSerial.print(' ');
+      bleSerial.print(rSpeed);
+      bleSerial.print(' ');
+      bleSerial.print(finalComp);
+      bleSerial.print(' ');
+      bleSerial.print(rSpeed * finalComp);
+      bleSerial.println();
     }
+    /*if (gSensorLeft > 30) {
+      compensation = (float)encoderRightCount / (float)encoderLeftCount;
+      setMotorVolts(lSpeed * 5 * compensation, rSpeed);
+    }*/
+
     setMotorVolts(lSpeed, rSpeed);
+    delay(100);
   }
 }
 
@@ -297,6 +317,7 @@ ISR(INT1_vect) {
 }
 
 void setup() {
+  bleSerial.begin(9600);
   Serial.begin(9600);
   Serial.println(F("Hello\n"));
   pinMode(EMITTER, OUTPUT);
