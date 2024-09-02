@@ -127,6 +127,8 @@ void setMotorVolts(float left, float right) {
 }
 
 void drive(float lSpeed, float rSpeed) {
+  encoderLeftCount = 0;
+  encoderRightCount = 0;
   Serial.println("Drive Function");
   uint32_t endTime = millis() + 2000;
   float compensation = 0;
