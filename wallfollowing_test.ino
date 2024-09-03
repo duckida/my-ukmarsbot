@@ -493,11 +493,12 @@ void runDistance() {
   if (gSensorLeft < 8) {
     Serial.println("Turing left");
     driveAngle(1.5,  1.5, 90);
+    delay(1000); 
+    driveDistance(1.5,  1.5, 180);
     delay(1000);
     //driveDistance(1.5,  1.5, 180);
-  } 
-  else if (gSensorFront > 14) {
-    driveAngle(1.5,  1.5, 90);
+  } else if (gSensorFront > 14) {
+    driveAngle(1.5,  1.5, -90);
     delay(2000);
     //driveAngle(1.5,  1.5, 90);
     //delay(1000)
