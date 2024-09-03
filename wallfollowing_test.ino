@@ -489,13 +489,13 @@ void runDistance() {
   getBatteryVolts();
   //driveDistance(1.5,  1.5, 180); // Speed 1.5, 180 mm
 
-  if (gSensorLeft < 17) {
+  if (gSensorLeft < 6) {
     Serial.println("Turing left");
     driveAngle(1.5,  1.5, 90);
     delay(1000);
     //driveDistance(1.5,  1.5, 180);
   } 
-  if (gSensorFront > 23) {
+  if (gSensorFront > 16) {
     driveAngle(1.5,  1.5, 90);
     delay(2000);
     //driveAngle(1.5,  1.5, 90);
