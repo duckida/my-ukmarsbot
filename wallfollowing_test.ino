@@ -398,7 +398,7 @@ void setup() {
   Serial.println(F("Hello\n"));
   motorSetup();
   setupEncoder();
-  setupSensor()
+  setupSensor();
   updateTime = millis() + updateInterval;
 }
 
@@ -536,7 +536,21 @@ void runMaze() {
 }
 
 void followLeftWall() {
-  
+  if (gSensorLeft < 25) {
+    // Gap on left - turn left and go forwards
+    driveAngle(1.5,  1.5, 90);
+  }
+  if (gSensorFront > 26) {
+    // Wall in front
+    if (gSensorRight < 25) {
+      // Gap on right - turn right and go forwards
+      driveAngle(1.5,  1.5, -90);
+    } else {
+      // No access - 180 turn and go forwards
+      driveAngle(1.5,  1.5, -180);
+    }
+  }
+  driveDistance(1.5,  1.5, 180);
 }
 
 
@@ -554,7 +568,8 @@ void loop() {
     //runRobot();
     //runDistance();
     //runAngle();
-    runMaze();
+    //runMaze();
+    followLeftWall();
   }
 
 }
