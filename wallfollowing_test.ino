@@ -37,7 +37,7 @@ SoftwareSerial bleSerial(0, 1);
 volatile int32_t encoderLeftCount;
 volatile int32_t encoderRightCount;
 uint32_t updateTime;
-uint32_t updateInterval = 100;  // in milliseconds
+uint32_t updateInterval = 40;  // in milliseconds
 const float MAX_MOTOR_VOLTS = 6.0f;
 const float batteryDividerRatio = 2.0f;
 
@@ -97,11 +97,11 @@ int decodeFunctionSwitch(int functionValue) {
   return result;
 }
 
-int getFunctionSwitch() {
+/* int getFunctionSwitch() {
   int functionValue = analogRead(FUNCTION_PIN);
   int function = decodeFunctionSwitch(functionValue);
   return function;
-}
+} */
 
 void motorSetup() {
   pinMode(MOTOR_LEFT_DIR, OUTPUT);
@@ -390,12 +390,13 @@ void setup() {
   digitalWrite(EMITTER, 0);  // be sure the emitter is off
   motorSetup();
   setupEncoder();
-  // analogueSetup();           // increase the ADC conversion speed
+  analogueSetup();           // increase the ADC conversion speed
   setupSystick();
   updateTime = millis() + updateInterval;
+  delay(2000);
 }
 
-void motorAction(int function) {
+/* void motorAction(int function) {
   switch (function) {
     case 0:
       drive(0, 0);
@@ -465,15 +466,15 @@ void motorAction(int function) {
       drive(0, 0);
       break;
   }
-}
+}*/ 
 
 void runRobot() {
-  int function = getFunctionSwitch();
+  // int function = getFunctionSwitch();
   // run the motors for a fixed amount of time (in milliseconds)
   getBatteryVolts();  // update the battery reading
   //encoderLeftCount = 0;
   //encoderRightCount = 0;
-  motorAction(function);
+  //motorAction(function);
   /* while (endTime > millis()) {
     if (getFunctionSwitch() == 16) {
       break;  // stop running if the button is pressed
@@ -489,20 +490,22 @@ void runDistance() {
   getBatteryVolts();
   //driveDistance(1.5,  1.5, 180); // Speed 1.5, 180 mm
 
-  if (gSensorLeft < 6) {
+  if (gSensorLeft < 8) {
     Serial.println("Turing left");
     driveAngle(1.5,  1.5, 90);
     delay(1000);
     //driveDistance(1.5,  1.5, 180);
   } 
-  if (gSensorFront > 16) {
+  else if (gSensorFront > 14) {
     driveAngle(1.5,  1.5, 90);
     delay(2000);
     //driveAngle(1.5,  1.5, 90);
     //delay(1000)
     Serial.println("180 deg turn");
-  }
+  } else {
   driveDistance(1.5,  1.5, 180);
+  delay(500);
+  }
   
 }
 
@@ -512,16 +515,17 @@ void runAngle() {
 }
 
 void loop() {
-  if (getFunctionSwitch() == 16) {
+  /*if (gSensorFront > 20) {
     // button is pressed so wait until it is released
-    while (getFunctionSwitch() == 16) {
+    while (gSensorFront == 20) {
       delay(20);
     }
     // now wait for the user to get clear
     Serial.println("Starting");
     encoderLeftCount = 0;
     encoderRightCount = 0;
-    delay(500);
+    delay(1000);
     runDistance();
-  }
+  }*/
+  runDistance();
 }
