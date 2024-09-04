@@ -26,6 +26,7 @@ const int SENSOR_LEFT_MARK = A5;
 const int FUNCTION_PIN = A6;
 const int BATTERY_VOLTS = A7;
 
+const float circumference = 103.9215686314;
 /****/
 
 /***
@@ -69,6 +70,11 @@ volatile bool gRightWall;
 volatile int gSensorFrontError;   // zero when robot in cell centre
 volatile float gSensorCTE;  // zero when robot in cell centre
 
+int leftWallCount = 0;
+int leftGapCount = 0;
+
+int frontWallCount = 0;
+int frontGapCount = 0;
 
 float gBatteryVolts;
 float getBatteryVolts() {
@@ -203,7 +209,7 @@ void driveDistance(float lSpeed, float rSpeed, float mm) {
   int encoderAvg = 0; // Average of 2 encoders
 
   //234 c = 113 mm
-  circumferences = mm / 106;
+  circumferences = mm / circumference;
   counts = circumferences * 234;
   while (encoderAvg < counts) {
     Serial.print(F("  Right: "));
@@ -267,6 +273,7 @@ void driveAngle(float lSpeed, float rSpeed, float deg) {
   }
   setMotorPWM(0, 0);
 }
+
 
 void analogueSetup() {
   // increase speed of ADC conversions to 28us each
@@ -354,6 +361,7 @@ void updateWallSensor() {
 
 ISR(TIMER2_COMPA_vect) {
   updateWallSensor();
+  checkWalls();
 }
 
 ISR(INT0_vect) {
@@ -487,55 +495,58 @@ void runRobot() {
   delay(500);
 }
 
+void checkWalls() {
+  if (gSensorLeft < 8) {
+    leftGapCount += 1;
+  } else if (gSensorLeft >= 8) {
+    leftWallCount += 1;
+  }
+  if (gSensorFront <= 4) {
+    frontGapCount += 1;
+  } else if (gSensorFront > 5) {
+    frontWallCount += 1;
+  }
+}
+
+
+
 void runDistance() {
   getBatteryVolts();
-  //driveDistance(1.5,  1.5, 180); // Speed 1.5, 180 mm
-
-  if (gSensorLeft < 8) {
-    Serial.println("Turing left");
-    driveAngle(1.5,  1.5, 90);
-    delay(1000); 
-    driveDistance(1.5,  1.5, 180);
-    delay(1000);
-    //driveDistance(1.5,  1.5, 180);
-  } else if (gSensorFront > 8) {
-    driveAngle(1.5,  1.5, -90);
-    delay(2000);
-    //driveAngle(1.5,  1.5, 90);
-    //delay(1000)
-    Serial.println("180 deg turn");
-  } else {
-  driveDistance(1.5,  1.5, 180);
-  delay(500);
-  }
-  
+  driveDistance(1,  1, 45); // Speed 1.5, 45 mm
 }
 
-void runAngle() {
+void clearValues() {
+  leftGapCount = 0;
+  leftWallCount = 0;
+  frontGapCount = 0;
+  frontWallCount = 0;
+}
+
+void runMaze() {
   getBatteryVolts();
-  driveAngle(1.5,  1.5, -90); // Speed 1.5, 180 degrees
+  if (leftGapCount > leftWallCount) { // If there's a gap on the left...
+    driveAngle(1.5,  1.5, 90); // Turn left
+    delay(100); // Delay for precision
+  }
+  if (frontWallCount > frontGapCount) { // If there's a wall on the front...
+    driveAngle(1.5,  1.5, -90); // Turn right
+    delay(100); // Delay for precision
+  } else {
+    driveDistance(1,  1, 180); // Forward @ speed 1.5, 180 mm
+  }
+  clearValues();
 }
+
 
 void loop() {
-  /*if (gSensorFront > 20) {
-    // button is pressed so wait until it is released
-    while (gSensorFront == 20) {
-      delay(20);
-    }
-    // now wait for the user to get clear
-    Serial.println("Starting");
-    encoderLeftCount = 0;
-    encoderRightCount = 0;
-    delay(1000);
-    runDistance();
-  }*/
-  runDistance();
-     // updateTime += updateInterval;
+  // checkWalls();
+  runMaze();
   Serial.print(F("  Left: "));
   Serial.print(gSensorLeft);
   Serial.print(F("  Front: "));
   Serial.print(gSensorFront);
   Serial.print(F("  Right: "));
   Serial.print(gSensorRight);
+  Serial.println();
 
 }
