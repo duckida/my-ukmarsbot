@@ -388,9 +388,9 @@ void setup() {
   pinMode(LED_RIGHT, OUTPUT);
   pinMode(LED_LEFT, OUTPUT);
   digitalWrite(EMITTER, 0);  // be sure the emitter is off
+  analogueSetup();           // increase the ADC conversion speed
   motorSetup();
   setupEncoder();
-  analogueSetup();           // increase the ADC conversion speed
   setupSystick();
   updateTime = millis() + updateInterval;
   delay(2000);
@@ -477,6 +477,7 @@ void runRobot() {
   //motorAction(function);
   /* while (endTime > millis()) {
     if (getFunctionSwitch() == 16) {
+      
       break;  // stop running if the button is pressed
     }
   } */
@@ -497,7 +498,7 @@ void runDistance() {
     driveDistance(1.5,  1.5, 180);
     delay(1000);
     //driveDistance(1.5,  1.5, 180);
-  } else if (gSensorFront > 14) {
+  } else if (gSensorFront > 8) {
     driveAngle(1.5,  1.5, -90);
     delay(2000);
     //driveAngle(1.5,  1.5, 90);
@@ -529,4 +530,12 @@ void loop() {
     runDistance();
   }*/
   runDistance();
+     // updateTime += updateInterval;
+  Serial.print(F("  Left: "));
+  Serial.print(gSensorLeft);
+  Serial.print(F("  Front: "));
+  Serial.print(gSensorFront);
+  Serial.print(F("  Right: "));
+  Serial.print(gSensorRight);
+
 }
