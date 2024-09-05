@@ -1,7 +1,5 @@
-//BLE Serial is for bluetooth module only
 #include <Arduino.h>
 #include "digitalWriteFast.h"
-#include <SoftwareSerial.h> 
 /**
  * Hardware pin defines
  */
@@ -33,7 +31,6 @@ const float circumference = 103.9215686314;
  * Global variables
  */
 
-SoftwareSerial bleSerial(0, 1); 
 
 volatile int32_t encoderLeftCount;
 volatile int32_t encoderRightCount;
@@ -212,20 +209,18 @@ void driveDistance(float lSpeed, float rSpeed, float mm) {
   circumferences = mm / circumference;
   counts = circumferences * 234;
   while (encoderAvg < counts) {
-    Serial.print(F("  Right: "));
+    Serial.print(F("R: "));
     Serial.print(gSensorRight);
-    Serial.print(F("  Front: "));
+    Serial.print(F("  F: "));
     Serial.print(gSensorFront);
-    Serial.print(F("  Left: "));
+    Serial.print(F("  L: "));
     Serial.print(gSensorLeft);
-    Serial.print(F("  Error: "));
-    Serial.print(gSensorCTE);
     Serial.println(); // sends "\r\n"
     if (encoderRightCount > 0 && encoderLeftCount > 0) {
       compensation = (float)encoderRightCount / (float)encoderLeftCount;
       //Serial.println(compensation);
       finalComp = 1 / compensation;
-      setMotorVolts(lSpeed, rSpeed * finalComp);
+      setMotorVolts(lSpeed * 0.98, rSpeed * finalComp);
     } else {
       setMotorVolts(lSpeed, rSpeed);
     }
@@ -327,7 +322,7 @@ void updateWallSensor() {
   // light them up
   digitalWrite(EMITTER, 1);
   // wait until all the detectors are stable
-  delayMicroseconds(50);
+  delayMicroseconds(15);
   // now find the differences
   right = analogRead(A0) - right;
   front = analogRead(A1) - front;
@@ -361,7 +356,7 @@ void updateWallSensor() {
 
 ISR(TIMER2_COMPA_vect) {
   updateWallSensor();
-  checkWalls();
+  // checkWalls();
 }
 
 ISR(INT0_vect) {
@@ -496,14 +491,14 @@ void runRobot() {
 }
 
 void checkWalls() {
-  if (gSensorLeft < 8) {
+  if (gSensorLeft < 15) {
     leftGapCount += 1;
-  } else if (gSensorLeft >= 8) {
+  } else if (gSensorLeft >= 15) {
     leftWallCount += 1;
   }
-  if (gSensorFront <= 4) {
+  if (gSensorFront <= 15) {
     frontGapCount += 1;
-  } else if (gSensorFront > 5) {
+  } else if (gSensorFront > 15) {
     frontWallCount += 1;
   }
 }
@@ -522,31 +517,31 @@ void clearValues() {
   frontWallCount = 0;
 }
 
+
 void runMaze() {
   getBatteryVolts();
-  if (leftGapCount > leftWallCount) { // If there's a gap on the left...
+  if (gSensorLeft < 8) { // If there's a gap on the left...
     driveAngle(1.5,  1.5, 90); // Turn left
     delay(100); // Delay for precision
   }
-  if (frontWallCount > frontGapCount) { // If there's a wall on the front...
+  if (gSensorFront > 4) { // If there's a wall on the front...
     driveAngle(1.5,  1.5, -90); // Turn right
     delay(100); // Delay for precision
+    if (gSensorFront > 5) { // If it's a dead end
+      driveAngle(1.5,  1.5, -90); // Turn right again
+    } else { // Otherwise
+      driveDistance(1,  1, 180); // Go forward
+    }
+    delay(200); // Delay for precision
   } else {
+
     driveDistance(1,  1, 180); // Forward @ speed 1.5, 180 mm
   }
-  clearValues();
 }
 
 
 void loop() {
   // checkWalls();
   runMaze();
-  Serial.print(F("  Left: "));
-  Serial.print(gSensorLeft);
-  Serial.print(F("  Front: "));
-  Serial.print(gSensorFront);
-  Serial.print(F("  Right: "));
-  Serial.print(gSensorRight);
-  Serial.println();
 
 }
