@@ -220,12 +220,13 @@ void driveDistance(float lSpeed, float rSpeed, float mm) {
       compensation = (float)encoderRightCount / (float)encoderLeftCount;
       //Serial.println(compensation);
       finalComp = 1 / compensation;
-      setMotorVolts(lSpeed * 0.98, rSpeed * finalComp);
+      setMotorVolts(lSpeed, rSpeed * finalComp);
     } else {
       setMotorVolts(lSpeed, rSpeed);
     }
     firstStep = encoderRightCount + encoderLeftCount;
     encoderAvg = firstStep / 2;
+    delay(30);
   }
   setMotorPWM(0, 0);
 }
@@ -384,7 +385,6 @@ ISR(INT1_vect) {
 }
 
 void setup() {
-  bleSerial.begin(9600);
   Serial.begin(9600);
   Serial.println(F("Hello\n"));
   pinMode(EMITTER, OUTPUT);
