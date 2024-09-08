@@ -227,12 +227,12 @@ void updateRightEncoder() {
   oldB = newB;
 }
 
-const float target = 8; // The target wall distance
+const float target = 22; // The target wall distance
 
 // Tuning Constants
-const float Kp = 0; // The Kp value
+const float Kp = 2; // The Kp value
 const float Ki = 0; // The Ki value
-const float Kd = 0; // The Kd value
+const float Kd = 1; // The Kd value
 
 float errorTotal = 0.0; // The sum of all error (for Integral)
 float oldError = 0.0; // The old error (for Derivative)
@@ -259,9 +259,10 @@ ISR(TIMER2_COMPA_vect) {
   updateLeftEncoder();
   updateRightEncoder();
   updateWallSensor();
+  getBatteryVolts();
 
   float pid = PID() / 100;
-  setMotorVolts(1.5 * pid, 1.5 * -pid);
+  setMotorVolts(1.5 + pid, 1.5 - pid);
 }
 
 void setup() {
