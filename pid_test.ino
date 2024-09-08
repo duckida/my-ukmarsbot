@@ -260,6 +260,8 @@ ISR(TIMER2_COMPA_vect) {
   updateRightEncoder();
   updateWallSensor();
 
+  float pid = PID() / 100;
+  setMotorVolts(1.5 * pid, 1.5 * -pid);
 }
 
 void setup() {
