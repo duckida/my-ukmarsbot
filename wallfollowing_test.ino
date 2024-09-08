@@ -539,7 +539,6 @@ void runMaze() {
   }
 }
 
-
 void loop() {
   // checkWalls();
   runMaze();
