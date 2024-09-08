@@ -227,6 +227,34 @@ void updateRightEncoder() {
   oldB = newB;
 }
 
+const float target = 8; // The target wall distance
+
+// Tuning Constants
+const float Kp = 0; // The Kp value
+const float Ki = 0; // The Ki value
+const float Kd = 0; // The Kd value
+
+float errorTotal = 0.0; // The sum of all error (for Integral)
+float oldError = 0.0; // The old error (for Derivative)
+
+float PID() {
+  int error = target - gSensorLeft; // Error = target value - current value
+
+  // Proportional
+  float proportional = error * Kp; // Proportional = error x tuning constant
+
+  // Integral
+  errorTotal += error; // Add the error to the sum of errors
+  float integral = errorTotal * Ki; // Integral = sum of all errors x tuning constant
+
+  // Derivative
+  float derivative = (oldError - error) * Kd; // Derivative = previous error - current error, x tuning constant
+  oldError = error; // Update the previous error
+
+  float pidSum = proportional + integral + derivative; // Sum the 3 values
+  return pidSum;
+}
+
 ISR(TIMER2_COMPA_vect) {
   updateLeftEncoder();
   updateRightEncoder();
