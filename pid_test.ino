@@ -262,7 +262,7 @@ ISR(TIMER2_COMPA_vect) {
   getBatteryVolts();
 
   float pid = PID() / 100;
-  setMotorVolts(1.5 + pid, 1.5 - pid);
+  setMotorVolts(1.5 - pid, 1.5 + pid);
 }
 
 void setup() {
