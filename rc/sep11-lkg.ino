@@ -31,7 +31,7 @@ const float circumference = 100.5f;//110;//103.9215686314;
  * Global variables
  */
 
-
+// Optimal battery charge - 7.2v - 7.3v
 volatile int32_t encoderLeftCount;
 volatile int32_t encoderRightCount;
 uint32_t updateTime;
@@ -370,10 +370,6 @@ void loop() {
 
   float pid = PID() / 100;
   setMotorVolts(1.5 - pid, 1.5 + pid); 
-  Serial.print(gSensorLeft);
-  Serial.print(" ");
-  Serial.print(gSensorFront);
-  Serial.print(" ");
-  Serial.print(gSensorRight);
-  Serial.println();
+  Serial.println(gBatteryVolts);
+
 }
