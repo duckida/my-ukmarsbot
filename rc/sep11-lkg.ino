@@ -362,7 +362,7 @@ void loop() {
   if (gSensorLeft < 10) {
     gapOnLeft();
   }
-  if (gSensorFront > 6) {
+  if (gSensorFront > 10) {
     setMotorPWM(0, 0);
     driveAngle(1.0, 1.0, -90);
     setMotorPWM(0, 0);
@@ -370,6 +370,6 @@ void loop() {
 
   float pid = PID() / 100;
   setMotorVolts(1.5 - pid, 1.5 + pid); 
-  Serial.println(gBatteryVolts);
+  Serial.println(gSensorLeft);
 
 }
