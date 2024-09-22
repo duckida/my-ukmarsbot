@@ -301,7 +301,7 @@ void driveAngle(float lSpeed, float rSpeed, float deg) {
   setMotorPWM(0, 0);
 }
 
-const float target = 30; // The target wall distance
+const float target = 32; // The target wall distance
 
 // Tuning Constants
 const float Kp = 1; // The Kp value
@@ -359,10 +359,10 @@ void setup() {
 }
 
 void loop() {
-  if (gSensorLeft < 16) {
+  if (gSensorLeft < 11) {
     gapOnLeft();
   }
-  if (gSensorFront > 42) {
+  if (gSensorFront > 26) {
     setMotorPWM(0, 0);
     driveAngle(1.0, 1.0, -90);
     setMotorPWM(0, 0);
