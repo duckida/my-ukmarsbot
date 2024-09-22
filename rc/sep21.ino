@@ -232,9 +232,9 @@ void updateWallSensor() {
     gSensorCTE = 0;
   }*/
   // make the results available to the rest of the program
-  gSensorLeft = left;
-  gSensorRight = right;
-  gSensorFront = front;
+  gSensorLeft = max(0,left);
+  gSensorRight = max(0,right);
+  gSensorFront = max(0,front);
 }
 
 void driveDistance(float lSpeed, float rSpeed, float mm) {
