@@ -305,10 +305,10 @@ const float target = 30; // The target wall distance
 
 // Tuning Constants
 const float Kp = 1; // The Kp value
-const float Ki = 0; // The Ki value
+// const float Ki = 0; // The Ki value
 const float Kd = 2; // The Kd value
 
-float errorTotal = 0.0; // The sum of all error (for Integral)
+// float errorTotal = 0.0; // The sum of all error (for Integral)
 float oldError = 0.0; // The old error (for Derivative)
 
 float PID() {
@@ -318,14 +318,14 @@ float PID() {
   float proportional = error * Kp; // Proportional = error x tuning constant
 
   // Integral
-  errorTotal += error; // Add the error to the sum of errors
-  float integral = errorTotal * Ki; // Integral = sum of all errors x tuning constant
+  // errorTotal += error; // Add the error to the sum of errors
+  // float integral = errorTotal * Ki; // Integral = sum of all errors x tuning constant
 
   // Derivative
   float derivative = (oldError - error) * Kd; // Derivative = previous error - current error, x tuning constant
   oldError = error; // Update the previous error
 
-  float pidSum = proportional + integral + derivative; // Sum the 3 values
+  float pidSum = proportional + derivative; // Sum the 3 values
   return pidSum;
 }
 
@@ -359,10 +359,10 @@ void setup() {
 }
 
 void loop() {
-  if (gSensorLeft < 10) {
+  if (gSensorLeft < 16) {
     gapOnLeft();
   }
-  if (gSensorFront > 30) {
+  if (gSensorFront > 42) {
     setMotorPWM(0, 0);
     driveAngle(1.0, 1.0, -90);
     setMotorPWM(0, 0);
