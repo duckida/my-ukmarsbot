@@ -1,4 +1,3 @@
-// With emitter padding foam
 #include <Arduino.h>
 #include "digitalWriteFast.h"
 /**
