@@ -301,7 +301,7 @@ void driveAngle(float lSpeed, float rSpeed, float deg) {
   setMotorPWM(0, 0);
 }
 
-const float target = 30; // The target wall distance 29 mm
+const float target = 33; // The target wall distance 29 mm
 
 // Tuning Constants
 const float Kp = 1; // The Kp value
@@ -359,14 +359,14 @@ void setup() {
 }
 
 void loop() {
-  if (gSensorLeft < 5) {
+  if (gSensorLeft < 7) {
     Serial.println("Gap on Left 5");
     gapOnLeft();
   }
-  if (gSensorFront > 17) { //32 mm
+  if (gSensorFront > 48) { //32 mm
     Serial.println("Wall in Front 30");
     setMotorPWM(0, 0);
-    driveAngle(1.0, 1.0, -97);
+    driveAngle(1.0, 1.0, -90);
     setMotorPWM(0, 0);
     // delay(150);
   }
