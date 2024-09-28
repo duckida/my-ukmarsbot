@@ -363,7 +363,7 @@ void loop() {
     Serial.println("Gap on Left 5");
     gapOnLeft();
   }
-  if (gSensorFront > 48) { //35 mm
+  if (gSensorFront > 35) { //4 mm
     // Serial.println("Wall in Front 30");
     setMotorPWM(0, 0);
     driveAngle(1.0, 1.0, -90);
