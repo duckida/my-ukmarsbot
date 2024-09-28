@@ -306,7 +306,7 @@ const float target = 30; // The target wall distance 29 mm
 // Tuning Constants
 const float Kp = 1; // The Kp value
 // const float Ki = 0; // The Ki value
-const float Kd = 2.6; // The Kd value
+const float Kd = 2; // The Kd value
 
 // float errorTotal = 0.0; // The sum of all error (for Integral)
 float oldError = 0.0; // The old error (for Derivative)
@@ -337,7 +337,7 @@ ISR(TIMER2_COMPA_vect) {
 }
 
 void gapOnLeft() {
-  driveDistance(1, 1, 135);
+  driveDistance(1, 1, 120); //135
   setMotorPWM(0, 0);
   driveAngle(1, 1, 96);
   driveDistance(1, 1, 25);
@@ -359,11 +359,11 @@ void setup() {
 }
 
 void loop() {
-  if (gSensorLeft < 10) {
+  if (gSensorLeft <= 12) {
     Serial.println("Gap on Left 5");
     gapOnLeft();
   }
-  if (gSensorFront > 40) { //35 mm
+  if (gSensorFront > 48) { //35 mm
     // Serial.println("Wall in Front 30");
     setMotorPWM(0, 0);
     driveAngle(1.0, 1.0, -90);
