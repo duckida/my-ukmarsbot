@@ -301,12 +301,12 @@ void driveAngle(float lSpeed, float rSpeed, float deg) {
   setMotorPWM(0, 0);
 }
 
-const float target = 33; // The target wall distance 29 mm
+const float target = 30; // The target wall distance 29 mm
 
 // Tuning Constants
 const float Kp = 1; // The Kp value
 // const float Ki = 0; // The Ki value
-const float Kd = 2; // The Kd value
+const float Kd = 2.6; // The Kd value
 
 // float errorTotal = 0.0; // The sum of all error (for Integral)
 float oldError = 0.0; // The old error (for Derivative)
@@ -359,12 +359,12 @@ void setup() {
 }
 
 void loop() {
-  if (gSensorLeft < 7) {
+  if (gSensorLeft < 10) {
     Serial.println("Gap on Left 5");
     gapOnLeft();
   }
-  if (gSensorFront > 48) { //32 mm
-    Serial.println("Wall in Front 30");
+  if (gSensorFront > 40) { //35 mm
+    // Serial.println("Wall in Front 30");
     setMotorPWM(0, 0);
     driveAngle(1.0, 1.0, -90);
     setMotorPWM(0, 0);
