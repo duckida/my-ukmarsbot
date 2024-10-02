@@ -208,7 +208,7 @@ void updateWallSensor() {
   // light them up
   digitalWrite(EMITTER, 1);
   // wait until all the detectors are stable
-  delayMicroseconds(15);
+  delayMicroseconds(50);
   // now find the differences
   right = analogRead(A0) - right;
   front = analogRead(A1) - front;
@@ -301,7 +301,7 @@ void driveAngle(float lSpeed, float rSpeed, float deg) {
   setMotorPWM(0, 0);
 }
 
-const float target = 30; // The target wall distance 29 mm
+const float target = 80; // The target wall distance 29 mm
 
 // Tuning Constants
 const float Kp = 1; // The Kp value
@@ -359,11 +359,11 @@ void setup() {
 }
 
 void loop() {
-  if (gSensorLeft <= 12) {
+  if (gSensorLeft <= 7) {
     // Serial.println("Gap on Left 5");
     gapOnLeft();
   }
-  if (gSensorFront > 40) { //40 mm
+  if (gSensorFront > 64) { //40 mm
     // Serial.println("Wall in Front 30");
     setMotorPWM(0, 0);
     driveAngle(1.0, 1.0, -90);
