@@ -69,7 +69,7 @@ volatile float gSensorCTE;  // zero when robot in cell centre
 
 bool atSensingPoint = true;
 
-int direction = 0; // at start, facing up
+
 
 float gBatteryVolts;
 float getBatteryVolts() {
@@ -338,6 +338,16 @@ ISR(TIMER2_COMPA_vect) {
   getBatteryVolts();
 }
 
+
+
+
+int x = 0;
+int y = 0;
+int direction = 0; // at start, facing up Direction 0N, 1E, 2S, 3W
+// Start is 0, 0
+const int multiplier = 2.3333333333;
+int cellThreshold = 180;
+
 void updateDirection(int change) {
   if (change < 0){
     direction += (360 + change) % 360; // subtracts from 360 and constrains using modulo
@@ -346,18 +356,45 @@ void updateDirection(int change) {
   }
   direction = direction % 360;
 }
+int targetX = 2;
+int targetY = 0;
+void updatePosition() {
+  switch(direction) {
+      case 0:
+        y += 1;
+        break;
+      case 90:
+        x += 1;
+        break;
+      case 180:
+        y -= 1;
+        break;
+      case 270:
+        x -= 1;
+        break;
+    }
+  if (x == targetX && y == targetY) {
+    setMotorVolts(0, 0);
+    delay(4000);
+  }
+  Serial.print(x);
+  Serial.print(" ");
+  Serial.print(y);
+  Serial.print(" ");
+  Serial.print(direction);
+  Serial.println();
+}
 
 void gapOnLeft() {
   driveDistance(1, 1, 125); //135
-  updateDirection(-90);
+  updatePosition();
   setMotorPWM(0, 0);
   driveAngle(1, 1, 94);
+  updateDirection(-90);
   driveDistance(1, 1, 25);
+  cellThreshold = 155;
 }
 
-int x = 0;
-int y = 0;
-// Start is 0, 0
 
 void setup() {
   Serial.begin(57600);
@@ -378,37 +415,9 @@ void setup() {
 
 
 
-void updatePosition() {
-  float encoderAvg = (encoderLeftCount + encoderRightCount) / 2;
-  if (encoderAvg > 420) {
-    encoderLeftCount = 0;
-    encoderRightCount = 0;
-    switch(direction) {
-      case 0:
-        y += 1;
-        break;
-      case 90:
-        x += 1;
-        break;
-      case 180:
-        y -= 1;
-        break;
-      case 270:
-        x -= 1;
-        break;
-    }
-  
-    Serial.print(x);
-    Serial.print(", ");
-    Serial.print(y);
-    Serial.println();
-  }
-}
-
 void loop() {
   if (gSensorLeft <= 3) { //7
     // Serial.println("Gap on Left 5");
-    updatePosition();
     gapOnLeft();
   }
   if (gSensorFront > 32) { //40 mm 67
@@ -417,12 +426,15 @@ void loop() {
     driveAngle(1.0, 1.0, -90);
     updateDirection(90);
     setMotorPWM(0, 0);
-    // delay(150);
-    // updatePosition();
   }
 
   float pid = PID() / 100;
   setMotorVolts(1.5 - pid, 1.5 + pid);
-  updatePosition();
-
+  float encoderAvg = (encoderLeftCount + encoderRightCount) / 2;
+  if (encoderAvg > cellThreshold * multiplier) {
+    updatePosition();
+    encoderLeftCount = 0;
+    encoderRightCount = 0;
+    cellThreshold = 180;
+  }
 }
