@@ -345,7 +345,7 @@ int x = 0;
 int y = 0;
 int direction = 0; // at start, facing up Direction 0N, 1E, 2S, 3W
 // Start is 0, 0
-const int multiplier = 2.3333333333;
+const double multiplier = 2.3333333333;
 int cellThreshold = 180;
 
 void updateDirection(int change) {
