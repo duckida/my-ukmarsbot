@@ -355,6 +355,13 @@ void updateDirection(int change) {
     direction += change % 360; // constrains using modulo
   }
   direction = direction % 360;
+
+  Serial.print(x);
+  Serial.print(" ");
+  Serial.print(y);
+  Serial.print(" ");
+  Serial.print(direction);
+  Serial.println();
 }
 int targetX = 2;
 int targetY = 0;
@@ -392,7 +399,9 @@ void gapOnLeft() {
   driveAngle(1, 1, 94);
   updateDirection(-90);
   driveDistance(1, 1, 25);
-  cellThreshold = 155;
+  cellThreshold = 100;
+  setMotorPWM(0, 0);
+  delay(4000);
 }
 
 
@@ -426,15 +435,24 @@ void loop() {
     driveAngle(1.0, 1.0, -90);
     updateDirection(90);
     setMotorPWM(0, 0);
+    Serial.print("Current Distance:");
+
+    delay(4000);
   }
 
   float pid = PID() / 100;
   setMotorVolts(1.5 - pid, 1.5 + pid);
+
   float encoderAvg = (encoderLeftCount + encoderRightCount) / 2;
-  if (encoderAvg > cellThreshold * multiplier) {
+  if (encoderAvg >= cellThreshold * multiplier) {
     updatePosition();
     encoderLeftCount = 0;
     encoderRightCount = 0;
     cellThreshold = 180;
-  }
+    setMotorPWM(0, 0);
+    delay(4000);
+  } 
+  // Serial.print(encoderAvg / multiplier);
+  // Serial.println();
+  
 }
