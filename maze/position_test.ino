@@ -27,9 +27,18 @@ const int BATTERY_VOLTS = A7;
 const float circumference = 100.5f;//110;//103.9215686314;
 /****/
 
-/***
- * Global variables
- */
+// WALL SENSOR VALUES
+
+const int frontWallThreshold = 68;
+const int leftGapThreshold = 6;
+
+// PID CONSTANTS
+const float target = 27; // The target wall distance 29 mm
+
+// Tuning Constants
+const float Kp = 1.5  ; // The Kp value
+// const float Ki = 0; // The Ki value
+const float Kd = 2; // The Kd value
 
 // Optimal battery charge - 7.2v - 7.3v
 volatile int32_t encoderLeftCount;
@@ -40,7 +49,7 @@ const float MAX_MOTOR_VOLTS = 6.0f;
 const float batteryDividerRatio = 2.0f;
 
 // Wall Sensor data setup
-
+/*
 const int FRONT_REFERENCE = 44;
 // the default values for the side sensors when the robot is centred in a cell
 const int LEFT_REFERENCE = 38;
@@ -55,11 +64,14 @@ const int RIGHT_WALL_THRESHOLD = RIGHT_REFERENCE / 2;   // minimum value to regi
 int gFrontReference = FRONT_REFERENCE;
 int gLeftReference = LEFT_REFERENCE;
 int gRightReference = RIGHT_REFERENCE;
+
+
+*/
 // the current value of the sensors
 volatile int gSensorFront;
 volatile int gSensorLeft;
 volatile int gSensorRight;
-// true f a wall is present
+// true if a wall is present
 volatile bool gFrontWall;
 volatile bool gLeftWall;
 volatile bool gRightWall;
@@ -69,8 +81,16 @@ volatile float gSensorCTE;  // zero when robot in cell centre
 
 bool atSensingPoint = true;
 
+// Positioning variables
+int cellThreshold = 180; 
+int x = 0;
+int y = 0;
+int direction = 0; // at start, facing up Direction 0N, 1E, 2S, 3W
+// Start is 0, 0
+const float multiplier = 2.3333333333;
 
 
+// Gets battery voltage
 float gBatteryVolts;
 float getBatteryVolts() {
   int adcValue = analogRead(BATTERY_VOLTS);
@@ -78,6 +98,9 @@ float getBatteryVolts() {
   return gBatteryVolts;
 }
 
+// ------------MOTORS-----------
+
+// Initialize the pins for the motors
 void motorSetup() {
   pinMode(MOTOR_LEFT_DIR, OUTPUT);
   pinMode(MOTOR_RIGHT_DIR, OUTPUT);
@@ -89,6 +112,7 @@ void motorSetup() {
   digitalWrite(MOTOR_RIGHT_DIR, 0);
 }
 
+// Set speed of left motor
 void setLeftMotorPWM(int pwm) {
   pwm = constrain(pwm, -255, 255);
   if (pwm < 0) {
@@ -100,6 +124,7 @@ void setLeftMotorPWM(int pwm) {
   }
 }
 
+// Set speed of right motor
 void setRightMotorPWM(int pwm) {
   pwm = constrain(pwm, -255, 255);
   if (pwm < 0) {
@@ -111,17 +136,20 @@ void setRightMotorPWM(int pwm) {
   }
 }
 
+// Set speed of both motors
 void setMotorPWM(int left, int right) {
   setLeftMotorPWM(left);
   setRightMotorPWM(right);
 }
 
+// Set voltage of left motor
 void setLeftMotorVolts(float volts) {
   volts = constrain(volts, -MAX_MOTOR_VOLTS, MAX_MOTOR_VOLTS);
   int motorPWM = (int)((255.0f * volts) / gBatteryVolts);
   setLeftMotorPWM(motorPWM);
 }
 
+// Set voltage of right motor
 void setRightMotorVolts(float volts) {
   volts = constrain(volts, -MAX_MOTOR_VOLTS, MAX_MOTOR_VOLTS);
   int motorPWM = (int)((255.0f * volts) / gBatteryVolts);
@@ -132,6 +160,8 @@ void setMotorVolts(float left, float right) {
   setLeftMotorVolts(left);
   setRightMotorVolts(right);
 }
+
+// ------------SETUP-----------
 
 void analogueSetup() {
   // increase speed of ADC conversions to 28us each
@@ -156,6 +186,9 @@ void setupSystick() {
   bitSet(TIMSK2, OCIE2A);
 }
 
+// ------------ENCODERS-----------
+
+// Sets up the encoders
 void setupEncoder() {
     // left
   pinMode(ENCODER_LEFT_CLK, INPUT);
@@ -177,6 +210,8 @@ void setupEncoder() {
   encoderRightCount = 0;
 }
 
+
+// Left encoder interrupt
 ISR(INT0_vect) {
   static bool oldB = 0;
   bool newB = bool(digitalReadFast(ENCODER_LEFT_B));
@@ -188,7 +223,8 @@ ISR(INT0_vect) {
   }
   oldB = newB;
 }
-
+ 
+// Right encoder interrupt
 ISR(INT1_vect) {
   static bool oldB = 0;
   bool newB = bool(digitalReadFast(ENCODER_RIGHT_B));
@@ -201,7 +237,9 @@ ISR(INT1_vect) {
   oldB = newB;
 }
 
+// ------------WALL SENSOR READING-----------
 
+// Read sensors
 void updateWallSensor() {
   // first read them dark
   int right = analogRead(A0);
@@ -239,6 +277,9 @@ void updateWallSensor() {
   gSensorFront = max(0,front);
 }
 
+// ------------DRIVE-----------
+
+// Drive a certain distance in mm
 void driveDistance(float lSpeed, float rSpeed, float mm) {
   encoderLeftCount = 0;
   encoderRightCount = 0;
@@ -267,6 +308,7 @@ void driveDistance(float lSpeed, float rSpeed, float mm) {
   setMotorPWM(0, 0);
 }
 
+// Turn to an angle
 void driveAngle(float lSpeed, float rSpeed, float deg) {
   encoderLeftCount = 0;
   encoderRightCount = 0;
@@ -303,16 +345,13 @@ void driveAngle(float lSpeed, float rSpeed, float deg) {
   setMotorPWM(0, 0);
 }
 
-const float target = 40; // The target wall distance 29 mm
+// ------------WALL SENSOR USAGE and PID-----------
 
-// Tuning Constants
-const float Kp = 1; // The Kp value
-// const float Ki = 0; // The Ki value
-const float Kd = 2; // The Kd value
 
 // float errorTotal = 0.0; // The sum of all error (for Integral)
 float oldError = 0.0; // The old error (for Derivative)
 
+// PID Controller
 float PID() {
   int error = target - gSensorLeft; // Error = target value - current value
 
@@ -331,22 +370,14 @@ float PID() {
   return pidSum;
 }
 
+// Wall sensor & Battery ISR
 ISR(TIMER2_COMPA_vect) {
-  //updateLeftEncoder();
-  //updateRightEncoder();
   updateWallSensor();
   getBatteryVolts();
 }
 
 
-
-
-int x = 0;
-int y = 0;
-int direction = 0; // at start, facing up Direction 0N, 1E, 2S, 3W
-// Start is 0, 0
-const double multiplier = 2.3333333333;
-int cellThreshold = 180;
+// ------------POSITIONING-----------
 
 void updateDirection(int change) {
   if (change < 0){
@@ -356,6 +387,7 @@ void updateDirection(int change) {
   }
   direction = direction % 360;
 
+  Serial.println("Changed Direction");
   Serial.print(x);
   Serial.print(" ");
   Serial.print(y);
@@ -365,6 +397,7 @@ void updateDirection(int change) {
 }
 int targetX = 2;
 int targetY = 0;
+
 void updatePosition() {
   switch(direction) {
       case 0:
@@ -384,6 +417,7 @@ void updatePosition() {
     setMotorVolts(0, 0);
     delay(4000);
   }
+  Serial.println("Changed Position");
   Serial.print(x);
   Serial.print(" ");
   Serial.print(y);
@@ -393,21 +427,38 @@ void updatePosition() {
 }
 
 void gapOnLeft() {
-  driveDistance(1, 1, 125); //135
-  updatePosition();
-  setMotorPWM(0, 0);
-  driveAngle(1, 1, 94);
-  updateDirection(-90);
-  driveDistance(1, 1, 25);
-  cellThreshold = 100;
-  setMotorPWM(0, 0);
-  delay(4000);
+  driveDistance(1, 1, 125); // go to the middle of the next cell 
+  updatePosition(); // increment the position
+  setMotorPWM(0, 0); // stop
+  delay(200);
+  driveAngle(1, 1, 94); // turn left
+  updateDirection(-90); // update direction
+  driveDistance(1, 1, 25); // go to the sensing point for the next cell
+  cellThreshold = 100; // the distance to get to the middle is less
 }
 
+// Asks the user using Serial for an X and Y target
+void askForTarget() {
+  Serial.println("Choose a target");
+  Serial.print("X: ");
+  while (Serial.available() == 0) { }
+  targetX = Serial.readStringUntil('\n').toInt();
+  Serial.print(targetX);
+  Serial.println();
+
+  delay(500);
+  
+  Serial.print("Y: ");
+  while (Serial.available() == 0) { }
+  targetY = Serial.readStringUntil('\n').toInt();
+  Serial.print(targetY);
+  Serial.println();
+}
+
+// ------------MAIN CODE-----------
 
 void setup() {
   Serial.begin(57600);
-  Serial.println(F("Hello\n"));
   pinMode(EMITTER, OUTPUT);
   pinMode(LED_RIGHT, OUTPUT);
   pinMode(LED_LEFT, OUTPUT);
@@ -417,42 +468,65 @@ void setup() {
   setupEncoder();
   setupSystick();
   updateTime = millis() + updateInterval;
-  delay(2000);
+
+  delay(4000);
+
+  Serial.println(R"(  __  __ _                                               
+ |  \/  (_) ___ _ __ ___  _ __ ___   ___  _   _ ___  ___ 
+ | |\/| | |/ __| '__/ _ \| '_ ` _ \ / _ \| | | / __|/ _ \
+ | |  | | | (__| | | (_) | | | | | | (_) | |_| \__ \  __/
+ |_|  |_|_|\___|_|  \___/|_| |_| |_|\___/ \__,_|___/\___|
+Let's solve it!)");
+
+
+  // Target Input
+  askForTarget();
+
   x = 0;
   y = 0;
 }
 
-
+float encoderAvg;
 
 void loop() {
-  if (gSensorLeft <= 3) { //7
-    // Serial.println("Gap on Left 5");
-    gapOnLeft();
-  }
-  if (gSensorFront > 32) { //40 mm 67
-    // Serial.println("Wall in Front 30");
-    setMotorPWM(0, 0);
-    driveAngle(1.0, 1.0, -90);
-    updateDirection(90);
-    setMotorPWM(0, 0);
-    Serial.print("Current Distance:");
 
-    delay(4000);
+  // /*
+  if (gSensorLeft <= leftGapThreshold) { // There's a gap on the left...
+    gapOnLeft(); // So go left
   }
+  if (gSensorFront > frontWallThreshold) { // There's a wall in front...
+    Serial.println("Wall in front");
+    Serial.print("Distance: ");
+    encoderAvg = (encoderLeftCount + encoderRightCount) / 2; // average the encoders
+    Serial.print(encoderAvg / multiplier);
+    Serial.println();
+    setMotorPWM(0, 0); // Stop
+    driveAngle(1.0, 1.0, -90); // Turn right
+    updateDirection(90); // Update direction
+  }
+
+
+  encoderAvg = (encoderLeftCount + encoderRightCount) / 2; // average the encoders
+  if (encoderAvg >= cellThreshold * multiplier) { // If we've traveled more than 1 cell...
+    setMotorVolts(0,0); // STOP!!
+    updatePosition(); // Add 1 to our coordinates
+    encoderLeftCount = 0; // Reset encoder counts
+    encoderRightCount = 0;
+    cellThreshold = 180; // Reset cell threshold.
+    delay(200);
+  } 
 
   float pid = PID() / 100;
-  setMotorVolts(1.5 - pid, 1.5 + pid);
+  setMotorVolts(1.5 - pid, 1.5 + pid); // DRIVE!!
+ // */
 
-  float encoderAvg = (encoderLeftCount + encoderRightCount) / 2;
-  if (encoderAvg >= cellThreshold * multiplier) {
-    updatePosition();
-    encoderLeftCount = 0;
-    encoderRightCount = 0;
-    cellThreshold = 180;
-    setMotorPWM(0, 0);
-    delay(4000);
-  } 
-  // Serial.print(encoderAvg / multiplier);
-  // Serial.println();
-  
+  /*
+  Serial.print(gSensorLeft);
+  Serial.print(" ");
+  Serial.print(gSensorFront);
+  Serial.print(" ");
+  Serial.print(gSensorRight);
+  Serial.println();
+  delay(200);
+  */
 }
