@@ -30,17 +30,17 @@ const float circumference = 100.5f;//110;//103.9215686314;
 // WALL SENSOR VALUES
 
 
-const int frontWallThreshold = 38;
-const int leftGapThreshold = 6;
-const int rightGapThreshold = 50;
+const int frontWallThreshold = 40;
+const int leftGapThreshold = 9;
+const int rightGapThreshold = 14;
 
 // PID CONSTANTS
-const float target = 26; // The target wall distance 29 mm
+float target = 12; // The target wall distance 29 mm
 
 // Tuning Constants
-const float Kp = 1.5  ; // The Kp value
+const float Kp = 1; // The Kp value
 // const float Ki = 0; // The Ki value
-const float Kd = 2; // The Kd value
+const float Kd = 1; // The Kd value
 
 // Optimal battery charge - 7.2v - 7.3v
 volatile int32_t encoderLeftCount;
@@ -93,9 +93,9 @@ const float multiplier = 2.3333333333;
 
 // FLOODFILL - WALL STORAGE
 // Define maze dimensions
-const int MAZE_WIDTH = 3;
-const int MAZE_HEIGHT = 3;
-const int QUEUE_SIZE = MAZE_WIDTH * MAZE_HEIGHT;
+const uint8_t MAZE_WIDTH = 3;
+const uint8_t MAZE_HEIGHT = 3;
+const uint8_t QUEUE_SIZE = MAZE_WIDTH * MAZE_HEIGHT;
 
 const byte WALL_NORTH = 0;  // bit 0 (value 1)
 const byte WALL_EAST  = 1;  // bit 1 (value 2)
@@ -107,8 +107,11 @@ const byte WALL_WEST  = 3;  // bit 3 (value 8)
 #define COMPASS_WEST 270
 #define COMPASS_SOUTH 180
 
-const int GOAL_X = 1;
-const int GOAL_Y = 1;
+uint8_t GOAL_X = 1;
+uint8_t GOAL_Y = 1;
+
+const uint8_t START_X = 0;
+const uint8_t START_Y = 0;
 
 struct Cell {
   uint8_t x;
@@ -216,6 +219,7 @@ void setMotorPWM(int left, int right) {
 
 // Set voltage of left motor
 void setLeftMotorVolts(float volts) {
+  //getBatteryVolts();
   volts = constrain(volts, -MAX_MOTOR_VOLTS, MAX_MOTOR_VOLTS);
   int motorPWM = (int)((255.0f * volts) / gBatteryVolts);
   setLeftMotorPWM(motorPWM);
@@ -223,6 +227,7 @@ void setLeftMotorVolts(float volts) {
 
 // Set voltage of right motor
 void setRightMotorVolts(float volts) {
+  //getBatteryVolts();
   volts = constrain(volts, -MAX_MOTOR_VOLTS, MAX_MOTOR_VOLTS);
   int motorPWM = (int)((255.0f * volts) / gBatteryVolts);
   setRightMotorPWM(motorPWM);
@@ -393,6 +398,22 @@ void driveDistance(float lSpeed, float rSpeed, float mm) {
   setMotorPWM(0, 0);
 }
 
+void drivePID(float lSpeed, float rSpeed, float distance) {
+  encoderLeftCount = encoderRightCount = 0;
+  Serial.println(gSensorLeft);
+  
+  float encoderAvg = (encoderLeftCount + encoderRightCount) / 2;
+      
+  float circumferences = distance / circumference;
+  float counts = circumferences * 234;
+  while (encoderAvg < counts) {
+    float pid = PID() / 100;
+    setMotorVolts(lSpeed - pid, rSpeed + pid);
+    encoderAvg = (encoderLeftCount + encoderRightCount) / 2;
+  }
+  setMotorVolts(0,0);
+}
+
 // Turn to an angle
 void driveAngle(float lSpeed, float rSpeed, float deg) {
   encoderLeftCount = 0;
@@ -459,7 +480,7 @@ float PID() {
 // Wall sensor & Battery ISR
 ISR(TIMER2_COMPA_vect) {
   updateWallSensor();
-  getBatteryVolts();
+  // getBatteryVolts();
 }
 
 
@@ -754,64 +775,102 @@ void setup() {
   setWall(x, y, calculateDirection(270));
 
   delay(3000);
+  target = gSensorLeft;
+  getBatteryVolts();
+  driveDistance(1.5, 1.5, 24);
 
 }
 
-float encoderAvg;
-bool reachedGoal;
+int state; // 0=solving 1=returning 2=stopped
 
 void goACellForward() {
   // from middle of cell
   driveDistance(1.5, 1.5, 50); // go to sensing point
-  atSensingPoint = true;
   Serial.println("I'm at the Sensing Point");
 
   delay(200);
 
-  updateWallSensor(); // read the sensors
-  if (gSensorLeft <= leftGapThreshold) {
+  int leftTotal = 0;
+  int rightTotal = 0;
+
+  int leftAvg; int rightAvg;
+
+  int i;
+  for (i=0; i<3; i++) {
+    updateWallSensor();
+    leftTotal += gSensorLeft;
+    rightTotal += gSensorRight;
+    Serial.print(gSensorLeft);
+    Serial.print(" ");
+    Serial.print(gSensorRight); Serial.println();
+  }
+
+  leftAvg = leftTotal / 3;
+  rightAvg = rightTotal / 3;
+
+  Serial.print("Averages: ");
+
+
+  Serial.print(leftAvg);
+  Serial.print(" ");
+  Serial.print(rightAvg); Serial.println();
+
+  // updateWallSensor(); // read the sensors
+  if (leftAvg <= leftGapThreshold) {
     leftWall = false;
   } else {
     leftWall = true;
     Serial.println("Wall on the left");
     Serial.print("Sensor: ");
-    Serial.print(gSensorLeft);
+    Serial.print(leftAvg);
     Serial.print(" & Threshold: ");
     Serial.print(leftGapThreshold);
     Serial.println();
   }
-  if (gSensorRight <= rightGapThreshold) {
+  if (rightAvg <= rightGapThreshold) {
     rightWall = false;
   } else {
     rightWall = true;
     Serial.println("Wall on the right");
     Serial.print("Sensor: ");
-    Serial.print(gSensorRight);
+    Serial.print(rightAvg);
     Serial.print(" & Threshold: ");
     Serial.print(rightGapThreshold);
     Serial.println();
   }
 
   // go to the middle of next cell
-  driveDistance(1.5, 1.5, 100); // RIGHT HERE SIDDHU
+  // driveDistance(1.5, 1.5, 100);
+
+  //if (leftWall) drivePID(1.5, 1.5, 100);
+  //else driveDistance(1.5, 1.5, 100);
+  driveDistance(1.5, 1.5, 100);
   updatePosition(); // update position
+
   Serial.println("I'm in the middle of the next cell"); 
   if (leftWall == true) setWall(x, y, calculateDirection(270)); // set walls
   if (rightWall == true) setWall(x, y, calculateDirection(90));
 }
 
 void loop() {
+  getBatteryVolts();
   printSensors();
-  delay(200);
+  printMazeWithWalls();
+  //delay(200);
 
-  /*
-
-  if (x == goal.x && y == goal.y) {
+  if ((x == goal.x && y == goal.y) && (state == 0)) {
     setMotorPWM(0, 0);
-    reachedGoal = true;
+    state = 1;
+    delay(500);
+    Serial.println("----I'm going home!----");
   }
 
-  if (!reachedGoal) {
+  if ((x == maze[START_X][START_Y].x && y == maze[START_X][START_Y].y) && (state == 1)) {
+    setMotorPWM(0, 0);
+    state = 2;
+  }
+
+  if (state == 0) { // solving state
     if (gSensorFront > frontWallThreshold) { // There's a wall in front...
       frontWall = true;
       setWall(x, y, direction);
@@ -836,75 +895,79 @@ void loop() {
 
 
     for (int n = 0; n < 4; n++) {
-      Serial.println("start!");
-      Serial.println(n);
+      //Serial.println("start!");
+      //    Serial.println(n);
         Cell neighbor;
         int cellId;
         switch (n) {
           case 0: // north
-            Serial.println("Printing N");
+            //Serial.println("Printing N");
             neighbor.x = currentCell.x;
             neighbor.y = currentCell.y + 1;
             cellId = COMPASS_NORTH;
             break;
           case 1: // east
-            Serial.println("Printing E");
+            //Serial.println("Printing E");
             neighbor.x = currentCell.x + 1;
             neighbor.y = currentCell.y;
             cellId = COMPASS_EAST;
             break;
           case 2:
-            Serial.println("Printing S");
+            //Serial.println("Printing S");
             neighbor.x = currentCell.x;
             neighbor.y = currentCell.y - 1;
             cellId = COMPASS_SOUTH;
             break;
           case 3: 
-            Serial.println("Printing W");
+            //Serial.println("Printing W");
             neighbor.x = currentCell.x - 1;
             neighbor.y = currentCell.y;
             cellId = COMPASS_WEST;
             break;
         }
 
-        Serial.println("before the `if` check");
-        Serial.print("cellid ");
-        Serial.print(cellId);
-        Serial.print(" x ");
-        Serial.print(neighbor.x);
-        Serial.print(" y ");
-        Serial.print(neighbor.y);
-        Serial.println();
+        //Serial.println("before the `if` check");
+        //Serial.print("cellid ");
+       //Serial.print(cellId);
+        //Serial.print(" x ");
+        //Serial.print(neighbor.x);
+        //Serial.print(" y ");
+        //Serial.print(neighbor.y);
+        //Serial.println();
 
         if (neighbor.x >= 0 && neighbor.x < MAZE_WIDTH && neighbor.y >= 0 && neighbor.y < MAZE_HEIGHT) { // check if neighbor is valid
           neighbor.cost = maze[neighbor.y][neighbor.x].cost; // fetch the cost of neighbor
-          Serial.print("*The lowest is: ");
-          Serial.print(neighbor.cost);
-          Serial.println();
           if (neighbor.cost < lowestCost && !hasWall(x, y, cellId)) {
-            Serial.println("and it passed wall check.");
+            //Serial.print("*The lowest is: ");
+            //Serial.print(neighbor.cost);
+            //Serial.println();
+            //Serial.println("and it passed wall check.");
             lowestCost = neighbor.cost;
             lowestCostCell = cellId;
           }
         } else {
-          Serial.println("it's not valid :(");
-          Serial.print("The one it thinks isn't valid is ");
-          Serial.print(cellId);
-          Serial.print(" with cost ");
-          Serial.print(neighbor.cost);
-          Serial.println();
+          //Serial.println("it's not valid :(");
+          //Serial.print("The one it thinks isn't valid is ");
+          //Serial.print(cellId);
+          //Serial.print(" with cost ");
+          //Serial.print(neighbor.cost);
+          //Serial.println();
         }
     }
 
-    Serial.print("FINAL ");
-    Serial.print(lowestCostCell);
-    Serial.print(" with cost ");
-    Serial.print(lowestCost);
-    Serial.println();
+    //Serial.print("FINAL ");
+    //Serial.print(lowestCostCell);
+    //Serial.print(" with cost ");
+    //Serial.print(lowestCost);
+    //Serial.println();
 
     delay(200);
 
-    int turningAngle = abs(lowestCostCell - direction);
+    int turningAngle = lowestCostCell - direction;
+    if (turningAngle < 0) {
+      turningAngle += 360;
+    }
+
     Serial.println(turningAngle);
     switch (turningAngle) {
       case 0:
@@ -918,21 +981,122 @@ void loop() {
         goACellForward();
         break;
       case 180:
+        Serial.println("I'll go South");
         driveAngle(1.0, 1.0, 180); // turn 180
         updateDirection(180); // update direction
         goACellForward();
         break;
       case 270:
+        Serial.println("I'll go Left");
         driveAngle(1.0, 1.0, 90); // turn left
         updateDirection(270);
         goACellForward();
         break;
     }
 
-  } else {
-    Serial.println("Goal achieved.");
+  } 
+  else if (state == 1) { // returning state
+    int cellToGo;
+
+    Cell currentCell = maze[y][x];
+
+    for (int n = 0; n < 4; n++) {
+      //Serial.println("start!");
+      //Serial.println(n);
+        Cell neighbor;
+        int cellId;
+        switch (n) {
+          case 0: // north
+            //Serial.println("Printing N");
+            neighbor.x = currentCell.x;
+            neighbor.y = currentCell.y + 1;
+            cellId = COMPASS_NORTH;
+            break;
+          case 1: // east
+            //Serial.println("Printing E");
+            neighbor.x = currentCell.x + 1;
+            neighbor.y = currentCell.y;
+            cellId = COMPASS_EAST;
+            break;
+          case 2:
+            //Serial.println("Printing S");
+            neighbor.x = currentCell.x;
+            neighbor.y = currentCell.y - 1;
+            cellId = COMPASS_SOUTH;
+            break;
+          case 3: 
+            //Serial.println("Printing W");
+            neighbor.x = currentCell.x - 1;
+            neighbor.y = currentCell.y;
+            cellId = COMPASS_WEST;
+            break;
+        }
+
+        //Serial.println("before the `if` check");
+        //Serial.print("cellid ");
+        //Serial.print(cellId);
+        //Serial.print(" x ");
+        //Serial.print(neighbor.x);
+        //Serial.print(" y ");
+        //Serial.print(neighbor.y);
+       // Serial.println();
+
+        if (neighbor.x >= 0 && neighbor.x < MAZE_WIDTH && neighbor.y >= 0 && neighbor.y < MAZE_HEIGHT) { // check if neighbor is valid
+          neighbor.cost = maze[neighbor.y][neighbor.x].cost; // fetch the cost of neighbor
+          if ((neighbor.cost - currentCell.cost == 1) && !hasWall(x, y, cellId)) {
+            //Serial.print("*The lowest is: ");
+            //Serial.print(neighbor.cost);
+            //Serial.println();
+            //Serial.println("and it passed wall check.");
+            cellToGo = cellId;
+          }
+        } else {
+          //Serial.println("it's not valid :(");
+          //Serial.print("The one it thinks isn't valid is ");
+          //Serial.print(cellId);
+          //Serial.print(" with cost ");
+          //Serial.print(neighbor.cost);
+          //Serial.println();
+        }
+    }
+
+    delay(200);
+
+    int turningAngle = cellToGo - direction;
+    if (turningAngle < 0) {
+      turningAngle += 360;
+    }
+
+    Serial.println(turningAngle);
+    switch (turningAngle) {
+      case 0:
+        Serial.println("I'll go Forward");
+        goACellForward();
+        break;
+      case 90: 
+        Serial.println("I'll go Right");
+        driveAngle(1.0, 1.0, -95); // turn right
+        updateDirection(90); // update direction
+        goACellForward();
+        break;
+      case 180:
+        Serial.println("I'll go South");
+        driveAngle(1.0, 1.0, 180); // turn 180
+        updateDirection(180); // update direction
+        goACellForward();
+        break;
+      case 270:
+        Serial.println("I'll go Left");
+        driveAngle(1.0, 1.0, 90); // turn left
+        updateDirection(270);
+        goACellForward();
+        break;
+    }
+
+  } 
+  else if (state = 2) {
+    Serial.println("Finished!");
   }
 
   delay(500);
-  */ 
 }
