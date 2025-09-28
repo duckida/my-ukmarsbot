@@ -32,15 +32,15 @@ const float circumference = 100.5f;//110;//103.9215686314;
 
 const int frontWallThreshold = 40;
 const int leftGapThreshold = 9;
-const int rightGapThreshold = 14;
+const int rightGapThreshold = 15;
 
 // PID CONSTANTS
 float target = 12; // The target wall distance 29 mm
 
 // Tuning Constants
-const float Kp = 1; // The Kp value
+const float Kp = 2; // The Kp value
 // const float Ki = 0; // The Ki value
-const float Kd = 1; // The Kd value
+const float Kd = 1.5; // The Kd value
 
 // Optimal battery charge - 7.2v - 7.3v
 volatile int32_t encoderLeftCount;
@@ -352,18 +352,6 @@ void updateWallSensor() {
   gSensorLeft = max(0,left);
   gSensorRight = max(0,right);
   gSensorFront = max(0,front);
-
-  if (gSensorLeft > leftGapThreshold) {
-    digitalWrite(LED_LEFT, HIGH);
-  } else {
-    digitalWrite(LED_LEFT, LOW);
-  }
-
-  if (gSensorRight > rightGapThreshold) {
-    digitalWrite(LED_RIGHT, HIGH);
-  } else {
-    digitalWrite(LED_RIGHT, LOW);
-  }
 }
 
 
@@ -842,9 +830,9 @@ void goACellForward() {
   // go to the middle of next cell
   // driveDistance(1.5, 1.5, 100);
 
-  //if (leftWall) drivePID(1.5, 1.5, 100);
-  //else driveDistance(1.5, 1.5, 100);
-  driveDistance(1.5, 1.5, 100);
+  if (leftWall) drivePID(1.5, 1.5, 100);
+  else driveDistance(1.5, 1.5, 100);
+
   updatePosition(); // update position
 
   Serial.println("I'm in the middle of the next cell"); 
@@ -853,6 +841,10 @@ void goACellForward() {
 }
 
 void loop() {
+
+  //printSensors();
+  //delay(100);
+  
   getBatteryVolts();
   printSensors();
   printMazeWithWalls();
@@ -1043,7 +1035,7 @@ void loop() {
 
         if (neighbor.x >= 0 && neighbor.x < MAZE_WIDTH && neighbor.y >= 0 && neighbor.y < MAZE_HEIGHT) { // check if neighbor is valid
           neighbor.cost = maze[neighbor.y][neighbor.x].cost; // fetch the cost of neighbor
-          if ((neighbor.cost - currentCell.cost == 1) && !hasWall(x, y, cellId)) {
+          if ((neighbor.cost - currentCell.cost == 1)) {
             //Serial.print("*The lowest is: ");
             //Serial.print(neighbor.cost);
             //Serial.println();
