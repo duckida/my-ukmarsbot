@@ -32,7 +32,7 @@ const float circumference = 100.5f;//110;//103.9215686314;
 
 const int frontWallThreshold = 40;
 const int leftGapThreshold = 9;
-const int rightGapThreshold = 15;
+const int rightGapThreshold = 3;
 
 // PID CONSTANTS
 float target = 12; // The target wall distance 29 mm
@@ -40,7 +40,7 @@ float target = 12; // The target wall distance 29 mm
 // Tuning Constants
 const float Kp = 2; // The Kp value
 // const float Ki = 0; // The Ki value
-const float Kd = 1.5; // The Kd value
+const float Kd = 2; // The Kd value
 
 // Optimal battery charge - 7.2v - 7.3v
 volatile int32_t encoderLeftCount;
@@ -94,7 +94,7 @@ const float multiplier = 2.3333333333;
 // FLOODFILL - WALL STORAGE
 // Define maze dimensions
 const uint8_t MAZE_WIDTH = 3;
-const uint8_t MAZE_HEIGHT = 3;
+const uint8_t MAZE_HEIGHT = 6;
 const uint8_t QUEUE_SIZE = MAZE_WIDTH * MAZE_HEIGHT;
 
 const byte WALL_NORTH = 0;  // bit 0 (value 1)
@@ -107,8 +107,8 @@ const byte WALL_WEST  = 3;  // bit 3 (value 8)
 #define COMPASS_WEST 270
 #define COMPASS_SOUTH 180
 
-uint8_t GOAL_X = 1;
-uint8_t GOAL_Y = 1;
+uint8_t GOAL_X = 2;
+uint8_t GOAL_Y = 5;
 
 const uint8_t START_X = 0;
 const uint8_t START_Y = 0;
@@ -828,7 +828,7 @@ void goACellForward() {
   }
 
   // go to the middle of next cell
-  // driveDistance(1.5, 1.5, 100);
+  //driveDistance(1.5, 1.5, 100);
 
   if (leftWall) drivePID(1.5, 1.5, 100);
   else driveDistance(1.5, 1.5, 100);
@@ -840,10 +840,15 @@ void goACellForward() {
   if (rightWall == true) setWall(x, y, calculateDirection(90));
 }
 
+
+
+
+/// ----------------------------LOOP----------------------------
+
 void loop() {
 
-  //printSensors();
-  //delay(100);
+  // printSensors();
+  // delay(100);
   
   getBatteryVolts();
   printSensors();
