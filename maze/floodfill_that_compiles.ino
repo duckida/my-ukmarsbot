@@ -27,20 +27,21 @@ const int BATTERY_VOLTS = A7;
 const float circumference = 100.5f;//110;//103.9215686314;
 /****/
 
+
+
+
 // WALL SENSOR VALUES
-
-
-const int frontWallThreshold = 40;
-const int leftGapThreshold = 9;
+const int frontWallThreshold = 16;
+const int leftGapThreshold = 3;
 const int rightGapThreshold = 3;
 
 // PID CONSTANTS
-float target = 12; // The target wall distance 29 mm
+float target = 23; // The target wall distance 29 mm
 
 // Tuning Constants
-const float Kp = 2; // The Kp value
+const float Kp = 5; // The Kp value
 // const float Ki = 0; // The Ki value
-const float Kd = 2; // The Kd value
+const float Kd = 0.23; // The Kd value
 
 // Optimal battery charge - 7.2v - 7.3v
 volatile int32_t encoderLeftCount;
@@ -387,6 +388,7 @@ void driveDistance(float lSpeed, float rSpeed, float mm) {
 }
 
 void drivePID(float lSpeed, float rSpeed, float distance) {
+  Serial.println("PIDDrive START");
   encoderLeftCount = encoderRightCount = 0;
   Serial.println(gSensorLeft);
   
@@ -400,6 +402,7 @@ void drivePID(float lSpeed, float rSpeed, float distance) {
     encoderAvg = (encoderLeftCount + encoderRightCount) / 2;
   }
   setMotorVolts(0,0);
+  Serial.println("PIDDrive END");
 }
 
 // Turn to an angle
@@ -763,13 +766,15 @@ void setup() {
   setWall(x, y, calculateDirection(270));
 
   delay(3000);
+  encoderLeftCount = 0;
+  encoderRightCount = 0;
   target = gSensorLeft;
   getBatteryVolts();
   driveDistance(1.5, 1.5, 24);
 
 }
 
-int state; // 0=solving 1=returning 2=stopped
+int state; // 0=solving 1=returning 2=stopped 3=failed
 
 void goACellForward() {
   // from middle of cell
@@ -778,12 +783,12 @@ void goACellForward() {
 
   delay(200);
 
-  int leftTotal = 0;
-  int rightTotal = 0;
+  uint8_t leftTotal = 0;
+  uint8_t rightTotal = 0;
 
-  int leftAvg; int rightAvg;
+  uint8_t leftAvg; uint8_t rightAvg;
 
-  int i;
+  uint8_t i;
   for (i=0; i<3; i++) {
     updateWallSensor();
     leftTotal += gSensorLeft;
@@ -830,8 +835,8 @@ void goACellForward() {
   // go to the middle of next cell
   //driveDistance(1.5, 1.5, 100);
 
-  if (leftWall) drivePID(1.5, 1.5, 100);
-  else driveDistance(1.5, 1.5, 100);
+  if (leftWall) drivePID(1.5, 1.5, 105);
+  else driveDistance(1.5, 1.5, 105);
 
   updatePosition(); // update position
 
@@ -840,35 +845,31 @@ void goACellForward() {
   if (rightWall == true) setWall(x, y, calculateDirection(90));
 }
 
-
-
-
-/// ----------------------------LOOP----------------------------
-
-void loop() {
-
-  // printSensors();
-  // delay(100);
-  
-  getBatteryVolts();
-  printSensors();
-  printMazeWithWalls();
-  //delay(200);
-
-  if ((x == goal.x && y == goal.y) && (state == 0)) {
-    setMotorPWM(0, 0);
-    state = 1;
-    delay(500);
-    Serial.println("----I'm going home!----");
-  }
-
-  if ((x == maze[START_X][START_Y].x && y == maze[START_X][START_Y].y) && (state == 1)) {
-    setMotorPWM(0, 0);
-    state = 2;
-  }
+void mazeLoop() {
 
   if (state == 0) { // solving state
-    if (gSensorFront > frontWallThreshold) { // There's a wall in front...
+    delay(100);
+    // 1. check front walls
+    uint16_t frontTotal = 0;
+    uint8_t i; 
+    for (i=0; i<3; i++) {
+      updateWallSensor();
+      frontTotal += gSensorFront;
+      Serial.print("FrontR ");
+      Serial.print(gSensorFront); Serial.println();
+    }
+
+    uint16_t frontAvg = frontTotal / 3;
+
+    Serial.print("FrontA ");
+    Serial.print(frontAvg); Serial.println();
+
+    Serial.print("FrontSensor: ");
+    Serial.print(frontAvg);
+    Serial.print("Threshold: ");
+    Serial.print(frontWallThreshold);
+    Serial.println();
+    if (frontAvg > frontWallThreshold) { // There's a wall in front...
       frontWall = true;
       setWall(x, y, direction);
     } else {
@@ -989,6 +990,8 @@ void loop() {
         updateDirection(270);
         goACellForward();
         break;
+      case 254:
+        state = 3; // failed
     }
 
   } 
@@ -1091,9 +1094,39 @@ void loop() {
     }
 
   } 
-  else if (state = 2) {
+  else if (state == 2) {
     Serial.println("Finished!");
   }
+  else if (state == 3) {
+    Serial.println("Failed");
+    setMotorPWM(0,0);
+  }
+}
 
+
+
+/// ----------------------------LOOP----------------------------
+
+void loop() {
+
+  //printSensors();
+  //delay(100);
+
+  getBatteryVolts();
+  printMazeWithWalls();
+
+  if ((x == goal.x && y == goal.y) && (state == 0)) {
+    setMotorPWM(0, 0);
+    state = 1;
+    delay(500);
+    Serial.println("----I'm going home!----");
+  }
+
+  if ((x == maze[START_X][START_Y].x && y == maze[START_X][START_Y].y) && (state == 1)) {
+    setMotorPWM(0, 0);
+    state = 2;
+  }
+
+  mazeLoop();
   delay(500);
 }
