@@ -35,11 +35,13 @@ const int frontWallThreshold = 16;
 const int leftGapThreshold = 3;
 const int rightGapThreshold = 3;
 
+float eDifference;
+
 // PID CONSTANTS
-float target = 23; // The target wall distance 29 mm
+float target = 12; // The target walldistance or encoderdifference
 
 // Tuning Constants
-const float Kp = 5; // The Kp value
+const float Kp = 4; // The Kp value
 // const float Ki = 0; // The Ki value
 const float Kd = 0.23; // The Kd value
 
@@ -98,11 +100,6 @@ const uint8_t MAZE_WIDTH = 3;
 const uint8_t MAZE_HEIGHT = 6;
 const uint8_t QUEUE_SIZE = MAZE_WIDTH * MAZE_HEIGHT;
 
-const byte WALL_NORTH = 0;  // bit 0 (value 1)
-const byte WALL_EAST  = 1;  // bit 1 (value 2)
-const byte WALL_SOUTH = 2;  // bit 2 (value 4)
-const byte WALL_WEST  = 3;  // bit 3 (value 8)
-
 #define COMPASS_NORTH 0
 #define COMPASS_EAST 90
 #define COMPASS_WEST 270
@@ -114,12 +111,21 @@ uint8_t GOAL_Y = 5;
 const uint8_t START_X = 0;
 const uint8_t START_Y = 0;
 
+enum Wall {
+  CLEAR = 0,
+  WALL = 1,
+  UNKNOWN = 2
+};
+
 struct Cell {
   uint8_t x;
   uint8_t y;
   uint8_t cost;
 
-  byte walls;
+  Wall north : 2;
+  Wall east : 2;
+  Wall west : 2;
+  Wall south : 2;
 };
 
 struct QueueObject {
@@ -132,38 +138,52 @@ Cell maze[MAZE_HEIGHT][MAZE_WIDTH];
 bool positionUpdated = false;
 bool mazeUpdated = false;
 
-void setWall(int x, int y, int dir) {
+void setWall(int x, int y, int dir, Wall state) {
   if (x < 0 || x >= MAZE_WIDTH || y < 0 || y >= MAZE_HEIGHT) return;
 
   if (dir == COMPASS_NORTH) { // North
-    maze[y][x].walls |= (1 << WALL_NORTH);  // Set North wall
-    if (y + 1 < MAZE_HEIGHT) maze[y+1][x].walls |= (1 << WALL_SOUTH);
+    maze[y][x].north = state;  // Set North wall
+    if (y + 1 < MAZE_HEIGHT) maze[y+1][x].south = state;
   }
   else if (dir == COMPASS_EAST) { // East
-    maze[y][x].walls |= (1 << WALL_EAST);
-    if (x + 1 < MAZE_WIDTH) maze[y][x+1].walls |= (1 << WALL_WEST);
+    maze[y][x].east = state;
+    if (x + 1 < MAZE_WIDTH) maze[y][x+1].west = state;
   }
   else if (dir == COMPASS_SOUTH) { // South
-    maze[y][x].walls |= (1 << WALL_SOUTH);
-    if (y - 1 >= 0) maze[y-1][x].walls |= (1 << WALL_NORTH);
+    maze[y][x].south = state;
+    if (y - 1 >= 0) maze[y-1][x].north = state;
   }
   else if (dir == COMPASS_WEST) { // West
-    maze[y][x].walls |= (1 << WALL_WEST);
-    if (x - 1 >= 0) maze[y][x-1].walls |= (1 << WALL_EAST);
+    maze[y][x].west = state;
+    if (x - 1 >= 0) maze[y][x-1].east = state;
   }
   mazeUpdated = true;
 }
 
+
 // Check if a wall exists in that direction
 bool hasWall(int x, int y, int dir) {
-  if (x < 0 || x >= MAZE_WIDTH || y < 0 || y >= MAZE_HEIGHT) return true; // out of bounds = wall
+  Wall wallState;
+  if (dir == COMPASS_NORTH)      wallState = maze[y][x].north;
+  else if (dir == COMPASS_EAST)  wallState = maze[y][x].east;
+  else if (dir == COMPASS_SOUTH) wallState = maze[y][x].south;
+  else if (dir == COMPASS_WEST)  wallState = maze[y][x].west;
+  else return false; // error case
 
-  if (dir == COMPASS_NORTH)      return maze[y][x].walls & (1 << WALL_NORTH);
-  else if (dir == COMPASS_EAST)  return maze[y][x].walls & (1 << WALL_EAST);
-  else if (dir == COMPASS_SOUTH) return maze[y][x].walls & (1 << WALL_SOUTH);
-  else if (dir == COMPASS_WEST) return maze[y][x].walls & (1 << WALL_WEST);
+  return (wallState == WALL); // true if there's a wall, false otherwise
+}
 
-  return true; // invalid dir treated as wall
+// Check if a wall is known in that direction
+Wall wallKnown(int x, int y, int dir) {
+  Wall wallState;
+  if (dir == COMPASS_NORTH)      wallState = maze[y][x].north;
+  else if (dir == COMPASS_EAST)  wallState = maze[y][x].east;
+  else if (dir == COMPASS_SOUTH) wallState = maze[y][x].south;
+  else if (dir == COMPASS_WEST)  wallState = maze[y][x].west;
+  else return UNKNOWN; // error case
+
+  Serial.println(wallState);
+  return wallState; // returns 0 1 or 2?
 }
 
 // Gets battery voltage
@@ -300,6 +320,7 @@ ISR(INT0_vect) {
     encoderLeftCount++;
   }
   oldB = newB;
+  eDifference = encoderLeftCount - encoderRightCount;
 }
 
 // Right encoder interrupt
@@ -313,6 +334,7 @@ ISR(INT1_vect) {
     encoderRightCount++;
   }
   oldB = newB;
+  eDifference = encoderLeftCount - encoderRightCount;
 }
 
 // ------------WALL SENSOR READING-----------
@@ -473,6 +495,7 @@ ISR(TIMER2_COMPA_vect) {
   updateWallSensor();
   // getBatteryVolts();
 }
+
 
 
 // ------------POSITIONING-----------
@@ -738,6 +761,19 @@ void printMazeWithWalls() {
 
 // ------------MAIN CODE-----------
 
+void debugUnknown() {
+  for (int i = 0; i < MAZE_HEIGHT; i++) {
+    for (int j = 0; j < MAZE_WIDTH; j++) {
+      if(maze[i][j].west == UNKNOWN) {
+        Serial.print("UNKNOWN @ ");
+        Serial.print(j);
+        Serial.print(" ");
+        Serial.print(i);
+        Serial.println();
+      }
+    }
+  }
+}
 
 bool leftWall = false;
 bool rightWall = false;
@@ -762,8 +798,18 @@ void setup() {
 
   x = 0;
   y = 0;
-  setWall(x, y, calculateDirection(90));
-  setWall(x, y, calculateDirection(270));
+
+  for (int i = 0; i < MAZE_HEIGHT; i++) {
+    for (int j = 0; j < MAZE_WIDTH; j++) {
+      maze[i][j].north = UNKNOWN;
+      maze[i][j].east = UNKNOWN;
+      maze[i][j].south = UNKNOWN;
+      maze[i][j].west = UNKNOWN;
+    }
+  }
+
+  setWall(0, 0, COMPASS_EAST, WALL);
+  setWall(0, 0, COMPASS_WEST, WALL);
 
   delay(3000);
   encoderLeftCount = 0;
@@ -841,12 +887,17 @@ void goACellForward() {
   updatePosition(); // update position
 
   Serial.println("I'm in the middle of the next cell"); 
-  if (leftWall == true) setWall(x, y, calculateDirection(270)); // set walls
-  if (rightWall == true) setWall(x, y, calculateDirection(90));
+  if (state == 0) { // exploring
+    Serial.println("i'll update the wall.");
+    if (leftWall == true) setWall(x, y, calculateDirection(270), WALL); // set walls
+    else setWall(x, y, calculateDirection(270), CLEAR);
+    if (rightWall == true) setWall(x, y, calculateDirection(90), WALL);
+    else setWall(x, y, calculateDirection(90), CLEAR);
+  } // otherwise don't update walls, leave as unknown
+
 }
 
 void mazeLoop() {
-
   if (state == 0) { // solving state
     delay(100);
     // 1. check front walls
@@ -869,12 +920,17 @@ void mazeLoop() {
     Serial.print("Threshold: ");
     Serial.print(frontWallThreshold);
     Serial.println();
-    if (frontAvg > frontWallThreshold) { // There's a wall in front...
-      frontWall = true;
-      setWall(x, y, direction);
-    } else {
-      frontWall = false;
+    if (state == 0) { // exploring
+      if (frontAvg > frontWallThreshold) { // There's a wall in front...
+        frontWall = true;
+        setWall(x, y, direction, WALL);
+      } else {
+        frontWall = false;
+        Serial.println("frontwall ha nai.");
+        setWall(x, y, direction, CLEAR);
+      }
     }
+
 
       // --- Flood update only when needed ---
     if (mazeUpdated || positionUpdated) {
@@ -1001,7 +1057,7 @@ void mazeLoop() {
     Cell currentCell = maze[y][x];
 
     for (int n = 0; n < 4; n++) {
-      //Serial.println("start!");
+      Serial.println("anneyeong haseyo!");
       //Serial.println(n);
         Cell neighbor;
         int cellId;
@@ -1040,23 +1096,19 @@ void mazeLoop() {
         //Serial.print(" y ");
         //Serial.print(neighbor.y);
        // Serial.println();
-
-        if (neighbor.x >= 0 && neighbor.x < MAZE_WIDTH && neighbor.y >= 0 && neighbor.y < MAZE_HEIGHT) { // check if neighbor is valid
+        Serial.print("Is the wall of ");
+        Serial.print(cellId);
+        Serial.print(" known? ");
+        Serial.print(wallKnown(neighbor.x, neighbor.y, cellId));
+        Serial.println();
+        debugUnknown();
+        if ((neighbor.x >= 0) && (neighbor.x < MAZE_WIDTH) && (neighbor.y >= 0) && (neighbor.y < MAZE_HEIGHT)) { // check if neighbor is valid
           neighbor.cost = maze[neighbor.y][neighbor.x].cost; // fetch the cost of neighbor
-          if ((neighbor.cost - currentCell.cost == 1)) {
-            //Serial.print("*The lowest is: ");
-            //Serial.print(neighbor.cost);
-            //Serial.println();
-            //Serial.println("and it passed wall check.");
+          if ((neighbor.cost - currentCell.cost == 1) && (wallKnown(neighbor.x, neighbor.y, cellId) == 0)) {
             cellToGo = cellId;
           }
         } else {
-          //Serial.println("it's not valid :(");
-          //Serial.print("The one it thinks isn't valid is ");
-          //Serial.print(cellId);
-          //Serial.print(" with cost ");
-          //Serial.print(neighbor.cost);
-          //Serial.println();
+          Serial.println("check failed.");
         }
     }
 
@@ -1065,7 +1117,11 @@ void mazeLoop() {
     int turningAngle = cellToGo - direction;
     if (turningAngle < 0) {
       turningAngle += 360;
-    }
+    } // ????
+
+    Serial.print("I'll go to ");
+    Serial.print(cellToGo);
+    Serial.println();
 
     Serial.println(turningAngle);
     switch (turningAngle) {
@@ -1094,10 +1150,10 @@ void mazeLoop() {
     }
 
   } 
-  else if (state == 2) {
+  else if (state == 2) { // finished
     Serial.println("Finished!");
   }
-  else if (state == 3) {
+  else if (state == 3) { // failed
     Serial.println("Failed");
     setMotorPWM(0,0);
   }
