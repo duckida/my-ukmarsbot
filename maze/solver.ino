@@ -31,19 +31,20 @@ const float circumference = 100.5f;//110;//103.9215686314;
 
 
 // WALL SENSOR VALUES
-const int frontWallThreshold = 16;
-const int leftGapThreshold = 3;
-const int rightGapThreshold = 3;
+uint8_t frontWallThreshold = 40;
+uint8_t leftGapThreshold = 15;
+uint8_t rightGapThreshold = 15;
 
 float eDifference;
 
 // PID CONSTANTS
-float target = 12; // The target walldistance or encoderdifference
+float target = 12; // The target walldistance left
+float rightTarget = 12; // The target walldistance right
 
 // Tuning Constants
-const float Kp = 4; // The Kp value
+const float Kp = 3; // The Kp value
 // const float Ki = 0; // The Ki value
-const float Kd = 0.23; // The Kd value
+const float Kd = 0.25; // The Kd value
 
 // Optimal battery charge - 7.2v - 7.3v
 volatile int32_t encoderLeftCount;
@@ -55,20 +56,20 @@ const float batteryDividerRatio = 2.0f;
 
 // Wall Sensor data setup
 
-const int FRONT_REFERENCE = 44;
+const uint8_t FRONT_REFERENCE = 44;
 // the default values for the side sensors when the robot is centred in a cell
-const int LEFT_REFERENCE = 38;
-const int RIGHT_REFERENCE = 49;
+const uint8_t LEFT_REFERENCE = 38;
+const uint8_t RIGHT_REFERENCE = 49;
 
 // the values above which, a wall is seen
-const int FRONT_WALL_THRESHOLD = FRONT_REFERENCE / 20;  // minimum value to register a wall
-const int LEFT_WALL_THRESHOLD = LEFT_REFERENCE / 2;     // minimum value to register a wall
-const int RIGHT_WALL_THRESHOLD = RIGHT_REFERENCE / 2;   // minimum value to register a wall
+const uint8_t FRONT_WALL_THRESHOLD = FRONT_REFERENCE / 20;  // minimum value to register a wall
+const uint8_t LEFT_WALL_THRESHOLD = LEFT_REFERENCE / 2;     // minimum value to register a wall
+const uint8_t RIGHT_WALL_THRESHOLD = RIGHT_REFERENCE / 2;   // minimum value to register a wall
 
 // working copies of the reference values
-int gFrontReference = FRONT_REFERENCE;
-int gLeftReference = LEFT_REFERENCE;
-int gRightReference = RIGHT_REFERENCE;
+uint8_t gFrontReference = FRONT_REFERENCE;
+uint8_t gLeftReference = LEFT_REFERENCE;
+uint8_t gRightReference = RIGHT_REFERENCE;
 
 
 
@@ -96,9 +97,9 @@ const float multiplier = 2.3333333333;
 
 // FLOODFILL - WALL STORAGE
 // Define maze dimensions
-const uint8_t MAZE_WIDTH = 3;
-const uint8_t MAZE_HEIGHT = 6;
-const uint8_t QUEUE_SIZE = MAZE_WIDTH * MAZE_HEIGHT;
+const uint8_t MAZE_WIDTH = 16;
+const uint8_t MAZE_HEIGHT = 16;
+const uint8_t QUEUE_SIZE = 64;//MAZE_WIDTH * MAZE_HEIGHT;
 
 #define COMPASS_NORTH 0
 #define COMPASS_EAST 90
@@ -409,7 +410,7 @@ void driveDistance(float lSpeed, float rSpeed, float mm) {
   setMotorPWM(0, 0);
 }
 
-void drivePID(float lSpeed, float rSpeed, float distance) {
+void drivePID(float lSpeed, float rSpeed, float distance, bool direction) { // direction : true for right
   Serial.println("PIDDrive START");
   encoderLeftCount = encoderRightCount = 0;
   Serial.println(gSensorLeft);
@@ -418,11 +419,21 @@ void drivePID(float lSpeed, float rSpeed, float distance) {
       
   float circumferences = distance / circumference;
   float counts = circumferences * 234;
-  while (encoderAvg < counts) {
-    float pid = PID() / 100;
-    setMotorVolts(lSpeed - pid, rSpeed + pid);
-    encoderAvg = (encoderLeftCount + encoderRightCount) / 2;
+
+  if (direction == true) { // right
+    while (encoderAvg < counts) {
+      float pid = rightPID() / 100;
+      setMotorVolts(lSpeed + pid, rSpeed - pid);
+      encoderAvg = (encoderLeftCount + encoderRightCount) / 2;
+    }
+  } else {
+    while (encoderAvg < counts) {
+      float pid = PID() / 100;
+      setMotorVolts(lSpeed - pid, rSpeed + pid);
+      encoderAvg = (encoderLeftCount + encoderRightCount) / 2;
+    }
   }
+
   setMotorVolts(0,0);
   Serial.println("PIDDrive END");
 }
@@ -474,6 +485,25 @@ float oldError = 0.0; // The old error (for Derivative)
 // PID Controller
 float PID() {
   int error = target - gSensorLeft; // Error = target value - current value
+
+  // Proportional
+  float proportional = error * Kp; // Proportional = error x tuning constant
+
+  // Integral
+  // errorTotal += error; // Add the error to the sum of errors
+  // float integral = errorTotal * Ki; // Integral = sum of all errors x tuning constant
+
+  // Derivative
+  float derivative = (oldError - error) * Kd; // Derivative = previous error - current error, x tuning constant
+  oldError = error; // Update the previous error
+
+  float pidSum = proportional + derivative; // Sum the 3 values
+  return pidSum;
+}
+
+// PID Controller
+float rightPID() {
+  int error = rightTarget - gSensorRight; // Error = target value - current value
 
   // Proportional
   float proportional = error * Kp; // Proportional = error x tuning constant
@@ -812,9 +842,16 @@ void setup() {
   setWall(0, 0, COMPASS_WEST, WALL);
 
   delay(3000);
+
   encoderLeftCount = 0;
   encoderRightCount = 0;
+
   target = gSensorLeft;
+  rightTarget = gSensorRight;
+
+  leftGapThreshold = (gSensorLeft / 2) + 1;
+  rightGapThreshold = (gSensorRight / 2) + 1;
+  
   getBatteryVolts();
   driveDistance(1.5, 1.5, 24);
 
@@ -829,13 +866,13 @@ void goACellForward() {
 
   delay(200);
 
-  uint8_t leftTotal = 0;
-  uint8_t rightTotal = 0;
+  uint16_t leftTotal = 0;
+  uint16_t rightTotal = 0;
 
   uint8_t leftAvg; uint8_t rightAvg;
 
-  uint8_t i;
-  for (i=0; i<3; i++) {
+  uint8_t i = 0;
+  for (i=0; i<50; i++) {
     updateWallSensor();
     leftTotal += gSensorLeft;
     rightTotal += gSensorRight;
@@ -844,8 +881,8 @@ void goACellForward() {
     Serial.print(gSensorRight); Serial.println();
   }
 
-  leftAvg = leftTotal / 3;
-  rightAvg = rightTotal / 3;
+  leftAvg = leftTotal / 50;
+  rightAvg = rightTotal / 50;
 
   Serial.print("Averages: ");
 
@@ -881,7 +918,8 @@ void goACellForward() {
   // go to the middle of next cell
   //driveDistance(1.5, 1.5, 100);
 
-  if (leftWall) drivePID(1.5, 1.5, 105);
+  if (leftWall) drivePID(1.5, 1.5, 105, false);
+  else if (rightWall) drivePID(1.5, 1.5, 105, true);
   else driveDistance(1.5, 1.5, 105);
 
   updatePosition(); // update position
@@ -903,14 +941,14 @@ void mazeLoop() {
     // 1. check front walls
     uint16_t frontTotal = 0;
     uint8_t i; 
-    for (i=0; i<3; i++) {
+    for (i=0; i<50; i++) {
       updateWallSensor();
       frontTotal += gSensorFront;
       Serial.print("FrontR ");
       Serial.print(gSensorFront); Serial.println();
     }
 
-    uint16_t frontAvg = frontTotal / 3;
+    uint16_t frontAvg = frontTotal / 50;
 
     Serial.print("FrontA ");
     Serial.print(frontAvg); Serial.println();
@@ -935,7 +973,7 @@ void mazeLoop() {
       // --- Flood update only when needed ---
     if (mazeUpdated || positionUpdated) {
       calculateFlood();
-      printMazeWithWalls();
+      // printMazeWithWalls();
       mazeUpdated = false;
       positionUpdated = false;
     }
@@ -1051,7 +1089,7 @@ void mazeLoop() {
     }
 
   } 
-  else if (state == 1) { // returning state
+  else if (state == 4) { // returning state
     int cellToGo;
 
     Cell currentCell = maze[y][x];
@@ -1096,12 +1134,12 @@ void mazeLoop() {
         //Serial.print(" y ");
         //Serial.print(neighbor.y);
        // Serial.println();
-        Serial.print("Is the wall of ");
+        /*Serial.print("Is the wall of ");
         Serial.print(cellId);
         Serial.print(" known? ");
         Serial.print(wallKnown(neighbor.x, neighbor.y, cellId));
         Serial.println();
-        debugUnknown();
+        debugUnknown();*/
         if ((neighbor.x >= 0) && (neighbor.x < MAZE_WIDTH) && (neighbor.y >= 0) && (neighbor.y < MAZE_HEIGHT)) { // check if neighbor is valid
           neighbor.cost = maze[neighbor.y][neighbor.x].cost; // fetch the cost of neighbor
           if ((neighbor.cost - currentCell.cost == 1) && (wallKnown(neighbor.x, neighbor.y, cellId) == 0)) {
@@ -1168,8 +1206,9 @@ void loop() {
   //printSensors();
   //delay(100);
 
+  
   getBatteryVolts();
-  printMazeWithWalls();
+  // printMazeWithWalls();
 
   if ((x == goal.x && y == goal.y) && (state == 0)) {
     setMotorPWM(0, 0);
